@@ -1,0 +1,305 @@
+/* Catalogue search and selection within the add-photo dialog. */
+.upload-dialog {
+  width: min(540px, calc(100% - 32px));
+  max-width: 540px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #46513d transparent;
+}
+
+.upload-dialog .form-label {
+  margin-top: 26px;
+  color: #dce3d2;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cultivar-picker {
+  position: relative;
+  z-index: 2;
+}
+
+.cultivar-search-field {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 11px;
+  padding: 0 13px;
+  border: 1px solid #424d39;
+  border-radius: 4px;
+  background: #141813;
+  color: #a9b49a;
+  transition: border-color .18s, box-shadow .18s;
+}
+
+.cultivar-search-field:focus-within {
+  border-color: #9cad83;
+  box-shadow: 0 0 0 3px #a5b98a20;
+}
+
+.cultivar-search-field > svg {
+  width: 17px;
+  height: 17px;
+}
+
+.cultivar-search-field input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f0f0e8;
+  font-size: 15px;
+}
+
+.cultivar-search-field input::placeholder {
+  color: #77816e;
+  font-size: 13px;
+}
+
+.cultivar-search-field input:focus-visible {
+  outline: 0;
+}
+
+#clearCultivar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: 3px;
+  color: #aeb9a1;
+}
+
+#clearCultivar:hover,
+#clearCultivar:focus-visible {
+  background: #303a28;
+  color: #eef4e2;
+}
+
+#clearCultivar svg {
+  width: 15px;
+  height: 15px;
+}
+
+.cultivar-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 5;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #414c38;
+  border-radius: 4px;
+  background: #191d18;
+  box-shadow: 0 16px 38px #0009;
+  scrollbar-color: #536248 #191d18;
+  scrollbar-width: thin;
+}
+
+.cultivar-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #30372d;
+  color: #e8eddf;
+  text-align: left;
+  transition: background-color .14s, color .14s;
+}
+
+.cultivar-option:last-of-type {
+  border-bottom: 0;
+}
+
+.cultivar-option:hover,
+.cultivar-option:focus-visible,
+.cultivar-option[aria-selected="true"] {
+  outline: 0;
+  background: #293321;
+  color: #f4f6eb;
+}
+
+.option-name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.option-aliases,
+.option-species {
+  color: #9ba58e;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.option-species {
+  color: #7f8d70;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+.cultivar-results-summary,
+.cultivar-no-results {
+  padding: 12px 14px;
+  color: #9aa48f;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.cultivar-no-results {
+  color: #c1c9b8;
+}
+
+.catalogue-status-line {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 1px 0;
+}
+
+.catalogue-status-line p {
+  color: #899481;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.catalogue-status-line p.is-loading {
+  color: #aab99a;
+}
+
+.catalogue-status-line p.is-error {
+  color: #d69b8b;
+}
+
+#catalogueRetry {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid #56664a;
+  border-radius: 3px;
+  color: #d8e4c5;
+  font-size: 11px;
+}
+
+#catalogueRetry:hover {
+  background: #293321;
+}
+
+.selected-cultivar {
+  margin-top: 10px;
+  padding: 14px 15px;
+  border: 1px solid #46543a;
+  border-left: 2px solid #b8c996;
+  background: #20271c;
+}
+
+.selected-cultivar-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.selected-cultivar-heading strong {
+  color: #edf1e5;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.selected-cultivar-heading span,
+.selected-cultivar-name {
+  color: #9eaa8e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.selected-cultivar-name,
+.selected-cultivar-aliases,
+.selected-cultivar-description {
+  margin-top: 7px;
+}
+
+.selected-cultivar-aliases {
+  color: #a8b19d;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.selected-cultivar-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #c0c7b7;
+  font-size: 12px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.selected-cultivar-link,
+.catalogue-origin a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #b7c69d;
+  text-decoration: underline;
+  text-decoration-color: #87977680;
+  text-underline-offset: 3px;
+}
+
+.selected-cultivar-link {
+  margin-top: 9px;
+  font-size: 11px;
+}
+
+.selected-cultivar-link svg,
+.catalogue-origin svg {
+  width: 11px;
+  height: 11px;
+}
+
+.catalogue-origin {
+  margin-top: 9px;
+  color: #77816e;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.catalogue-origin a {
+  color: #9ca98a;
+}
+
+.upload-dialog .drop-zone {
+  margin-top: 18px;
+}
+
+@media (max-width: 580px) {
+  .upload-dialog {
+    width: calc(100% - 24px);
+    max-width: none;
+    max-height: calc(100dvh - 24px);
+    padding: 22px 20px;
+  }
+
+  .cultivar-search-field input {
+    font-size: 16px;
+  }
+
+  .cultivar-results {
+    max-height: min(240px, 36dvh);
+  }
+}

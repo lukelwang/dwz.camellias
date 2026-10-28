@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" data-style="noir" data-dark="true">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://camellia-nomenclature.github.io; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#101310">
+  <meta name="description" content="花间，我的私人茶花图鉴。收藏每一次花开，探索茶花品种与属于自己的影像。">
+  <title>花间 · 私人茶花图鉴</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="catalogue-picker.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="assets/flower.svg" type="image/svg+xml">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-flower" viewBox="0 0 32 32"><path d="M16 12C7 0 0 11 12 16 0 21 7 32 16 20 25 32 32 21 20 16 32 11 25 0 16 12Z"/><circle cx="16" cy="16" r="3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.5 5.7a5.4 5.4 0 0 0-7.6 0l-.9.9-.9-.9a5.4 5.4 0 0 0-7.6 7.6L12 22l8.5-8.7a5.4 5.4 0 0 0 0-7.6Z" transform="translate(0 -1.7) scale(1 .96)"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M8 6 9.5 3h5L16 6h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"/><circle cx="12" cy="12.5" r="4"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6m-11 5L20 4M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+  </defs></svg>
+
+
+  <div id="storeStatus" class="store-status" role="status" aria-live="polite"><span id="storeMessage">正在打开花园…</span><button id="reloadGallery" hidden>重新读取花园</button></div>
+
+  <header class="site-header page-width">
+    <a class="brand" href="#" aria-label="花间，返回首页"><svg><use href="#i-flower"/></svg><span>花间<span class="brand-en">CAMELLIA</span></span></a>
+    <nav aria-label="主导航">
+      <a href="#collection" class="nav-gallery active">品种图库</a>
+      <button class="nav-favorites">我的收藏 <span id="navFavoriteCount">0</span></button>
+      <a href="https://camellia-nomenclature.github.io/" target="_blank" rel="noopener noreferrer" class="nav-source">品种资料库 <svg><use href="#i-external"/></svg></a>
+    </nav>
+    <div class="header-tools"><button id="loginEntry" class="login-entry">管理登录 ↗</button><span id="adminBadge" hidden>管理员</span><button id="siteSettings" hidden>页面设置</button><button id="logoutButton" hidden>退出</button><button class="add-photo header-add" data-admin hidden><svg><use href="#i-plus"/></svg><span>添加照片</span></button></div>
+  </header>
+
+  <main>
+    <section class="hero page-width" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> A PERSONAL CAMELLIA COLLECTION</div>
+        <h1 id="heroTitle">收藏花开，<br><span>也收藏时光。</span></h1>
+        <p class="hero-description">四百余种茶花，一个慢慢生长的花园。<br>用镜头留住每一朵，独一无二的盛放。</p>
+        <a class="hero-link" href="#collection">走进我的花园 <span><svg><use href="#i-arrow"/></svg></span></a>
+        <div class="hero-stats"><div><strong>400<span>+</span></strong><span>园中珍藏品种</span></div><div><strong id="heroAlbumCount">0</strong><span>已收录相册</span></div><div><strong>∞</strong><span>值得记录的花开</span></div></div>
+      </div>
+      <button class="hero-art hero-empty" disabled aria-label="花园等待第一朵花开">
+        <span class="empty-hero-flower"><svg><use href="#i-flower"/></svg></span>
+        <span class="hero-art-shade"></span>
+        <span class="hero-art-top">GROWING WITH PATIENCE <span>始于一朵花</span></span>
+        <span class="hero-art-bottom"><span><small>每次花开，都值得珍藏</small><strong>等待第一朵花开</strong><em>一个慢慢生长的花园</em></span><span class="round-arrow"><svg><use href="#i-arrow"/></svg></span></span>
+        <span class="hero-ref"></span>
+      </button>
+      <div class="hero-side-note">A LITTLE GARDEN. A LIFETIME OF WONDER.</div>
+    </section>
+
+    <section id="collection" class="collection page-width" aria-labelledby="collectionTitle">
+      <div class="section-heading"><div><span class="section-index">THE COLLECTION / 001</span><h2 id="collectionTitle">我的茶花图鉴<span id="headingCount">0</span></h2></div><p>一花一相册，每一朵都有自己的故事。</p></div>
+      <div class="search-line"><div class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="寻找一朵茶花，试试「珍珠」或 Nuccio…" aria-label="搜索品种名、中文别名或描述" autocomplete="off"><kbd>/</kbd></div><button class="filter-toggle" aria-expanded="false" aria-controls="moreFilters"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></svg>更多筛选<span id="filterBadge" hidden></span></button></div>
+      <div class="filter-row"><div class="category-tabs" role="group" aria-label="按茶花类别筛选"><button data-category="all" class="selected" aria-pressed="true">全部品种</button><button data-category="Japonica" aria-pressed="false">山茶 <span>Japonica</span></button><button data-category="Sasanqua" aria-pressed="false">茶梅 <span>Sasanqua</span></button><button data-category="Reticulata" aria-pressed="false">滇山茶 <span>Reticulata</span></button><button data-category="NRH" aria-pressed="false">杂交种 <span>Hybrid</span></button></div><button id="favoritesFilter" aria-pressed="false"><svg><use href="#i-heart"/></svg>只看收藏</button></div>
+      <div id="moreFilters" class="more-filters" hidden><label>花色<select id="colorFilter"><option value="all">全部花色</option><option value="pink">粉色</option><option value="white">白色</option><option value="red">红色</option><option value="bicolor">复色</option><option value="yellow">淡黄色</option></select></label><label>花型<select id="formFilter"><option value="all">全部花型</option><option value="formal">完全重瓣型</option><option value="single">单瓣型</option><option value="semi">半重瓣型</option><option value="peony">牡丹型</option><option value="anemone">托桂型</option></select></label><button id="resetFilters">重置筛选</button></div>
+      <div class="results-toolbar"><p id="resultSummary" role="status" aria-live="polite">正在打开花园…</p><div><span class="reference-note">花园里的真实花开</span><label class="sort-label"><span class="sr-only">排序</span><select id="sort"><option value="curated">随机浏览</option><option value="name">品种名 A–Z</option><option value="photos">照片数量</option></select></label></div></div>
+      <div id="gallery" class="gallery" aria-label="茶花品种相册"></div>
+      <div id="emptyState" class="empty-state" hidden><svg><use href="#i-flower"/></svg><h3>这一朵，还没在这里盛开。</h3><p>换一个名字，或放宽筛选条件试试。</p><button id="emptyReset">查看全部品种 <svg><use href="#i-arrow"/></svg></button></div>
+      <p class="gallery-end"><span></span> 花会再开，记忆会留下。<span></span></p>
+    </section>
+
+    <section class="garden-note page-width"><div class="note-flower"><svg><use href="#i-flower"/></svg></div><div><span class="section-index">GROWN WITH PATIENCE. KEPT WITH LOVE.</span><h2>不只是品种，也是生活的片刻。</h2><p>同一株茶花，不同年份、不同光线、不同的花开。<br>把它们放在一起，便是属于这个花园的独家记忆。</p></div><button class="add-photo note-add" data-admin hidden>记录一次花开 <svg><use href="#i-plus"/></svg></button></section>
+  </main>
+  <footer class="site-footer page-width"><a class="brand" href="#"><svg><use href="#i-flower"/></svg><span>花间<span class="brand-en">CAMELLIA</span></span></a><p>一个私人的花园，一份长久的喜欢。</p><span>品种资料来自 <a href="https://camellia-nomenclature.github.io/" target="_blank" rel="noopener noreferrer">Camellia Nomenclature <svg><use href="#i-external"/></svg></a></span></footer>
+
+  <dialog id="albumDialog" class="album-dialog" aria-label="品种相册"><div id="albumContent"></div></dialog>
+  <dialog id="loginDialog" class="login-dialog" aria-labelledby="loginTitle"><div class="dialog-heading"><span class="eyebrow">YOUR PRIVATE GARDEN</span><button data-close="loginDialog" class="icon-button" aria-label="关闭管理登录"><svg><use href="#i-close"/></svg></button></div><h2 id="loginTitle">管理我的花园</h2><p>仅限仓库所有者登录。令牌只留在本页内存中，刷新即退出；照片公开可见。</p><details class="token-help"><summary>创建管理令牌</summary><p>在 <a href="https://github.com/settings/personal-access-tokens/new?name=Camellia%20Gallery&amp;target_name=lukelwang&amp;contents=write&amp;expires_in=90" target="_blank" rel="noopener noreferrer">GitHub 创建 fine-grained token ↗</a>，Resource owner 选择 <strong>lukelwang</strong>；Only select repositories 仅选择 <strong>dwz.camellias.photo</strong>；Repository permissions 中设置 <strong>Contents: Read and write</strong>，Metadata 保留默认读取权限。</p></details><form id="loginForm"><label for="githubToken">GitHub 管理令牌</label><input id="githubToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="GitHub fine-grained token" required><p id="loginError" class="form-error" role="alert"></p><button class="primary-button" type="submit">验证并登录 →</button></form></dialog>
+  <dialog id="uploadDialog" class="upload-dialog" aria-labelledby="uploadTitle"><div class="dialog-heading"><span class="eyebrow">A NEW BLOOM, A NEW MEMORY</span><button data-close="uploadDialog" class="icon-button" aria-label="关闭添加照片"><svg><use href="#i-close"/></svg></button></div><h2 id="uploadTitle">记录一次花开</h2><p class="upload-intro">一个品种，一次多选。把这次花开，放进同一本相册。</p><div class="upload-steps"><span id="stepCultivar" class="active">01 选品种</span><span id="stepPhotos">02 多选照片</span><span id="stepReview">03 检查并加入</span></div><form id="uploadForm"><label class="form-label" for="cultivarSearch">这次拍的是哪个品种？</label><div class="cultivar-picker"><div class="cultivar-search-field"><svg><use href="#i-search"/></svg><input id="cultivarSearch" role="combobox" aria-autocomplete="list" aria-controls="cultivarResults" aria-expanded="false" placeholder="搜索英文名、中文名或别名…" autocomplete="off"><button type="button" id="clearCultivar" aria-label="重新选择品种" hidden>×</button></div><div id="cultivarResults" class="cultivar-results" role="listbox" aria-label="茶花搜索结果" hidden></div></div><p id="catalogueStatus" class="catalogue-status" role="status"></p><div id="selectedCultivarCard" class="selected-cultivar" hidden></div><button type="button" id="useManualCultivar" class="manual-cultivar">手动填写这个品种</button><section id="uploadPhotoSection" hidden><label class="mobile-photo-picker" for="photoFiles"><svg><use href="#i-camera"/></svg><strong>从 iPhone 相册或电脑选择照片</strong><span>可一次多选 · 全部归入上方品种</span><input id="photoFiles" type="file" accept="image/*,.heic,.heif" multiple></label><p class="photo-import-note">保存画廊 JPEG（最长边 2560px）和缩略图，原图仍留在你的相册。拍摄时间从 EXIF 读取；缺失时留空，可手动填写。</p><p id="importStatus" role="status"></p><div id="pendingPhotos" class="pending-photos"></div><div id="batchFrame" class="batch-frame" hidden><h3>这一批照片的边框</h3><div id="uploadFrameControls"></div></div></section><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>重新读取最新花园 · 保留输入</button><button type="button" class="reauth-draft" hidden>重新验证身份 · 保留输入</button></div><p id="uploadError" class="form-error" role="alert"></p><div class="upload-submit-bar"><span id="uploadSummary">先选择一个品种</span><button type="submit" id="uploadSubmit" class="primary-button" disabled>保存到花园 →</button></div></form></dialog>
+  <dialog id="albumEditDialog" class="edit-dialog" aria-labelledby="albumEditTitle"><div class="dialog-heading"><span class="eyebrow">EDIT CULTIVAR</span><button data-close="albumEditDialog" class="icon-button" aria-label="关闭品种编辑"><svg><use href="#i-close"/></svg></button></div><h2 id="albumEditTitle">编辑品种与相册</h2><form id="albumEditForm"><input id="editingAlbumId" type="hidden"><div class="form-grid"><label>展示名称<input id="editDisplayName" required></label><label>英文品种名<input id="editCanonicalName" required></label><label>类别<input id="editSpecies" list="speciesOptions"></label><label>花径分类<input id="editSize"></label><label>花色<select id="editColor"><option value="">见描述</option><option value="pink">粉色</option><option value="red">红色</option><option value="white">白色</option><option value="bicolor">复色</option><option value="yellow">淡黄色</option></select></label><label>花型<select id="editForm"><option value="">见描述</option><option value="formal">完全重瓣</option><option value="single">单瓣</option><option value="semi">半重瓣</option><option value="peony">牡丹型</option><option value="anemone">托桂型</option></select></label></div><label>展示描述<textarea id="editDescription" rows="4"></textarea></label><label>我的备注<textarea id="editNotes" rows="3" placeholder="记录这一株的故事…"></textarea></label><h3>相册默认边框</h3><div id="albumFrameControls"></div><div id="albumFramePreview" class="frame-preview"></div><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>重新读取最新花园 · 保留输入</button><button type="button" class="reauth-draft" hidden>重新验证身份 · 保留输入</button></div><p id="albumEditError" class="form-error"></p><button class="primary-button" type="submit">保存相册修改 →</button></form></dialog>
+  <dialog id="photoEditDialog" class="edit-dialog" aria-labelledby="photoEditTitle"><div class="dialog-heading"><span class="eyebrow">EDIT PHOTOGRAPH</span><button data-close="photoEditDialog" class="icon-button" aria-label="关闭照片编辑"><svg><use href="#i-close"/></svg></button></div><h2 id="photoEditTitle">编辑这一张花开</h2><form id="photoEditForm"><input id="editingPhotoAlbumId" type="hidden"><input id="editingPhotoId" type="hidden"><div id="photoFramePreview" class="frame-preview"></div><label>照片说明<input id="editCaption" placeholder="为这一刻写一句话…"></label><label>拍摄日期与时间<input id="editTakenAt" type="datetime-local"></label><p id="photoDateSource" class="photo-import-note"></p><h3>这张照片的边框</h3><div id="photoFrameControls"></div><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>重新读取最新花园 · 保留输入</button><button type="button" class="reauth-draft" hidden>重新验证身份 · 保留输入</button></div><button class="primary-button" type="submit">保存照片修改 →</button></form></dialog>
+  <dialog id="settingsDialog" class="edit-dialog" aria-labelledby="settingsTitle"><div class="dialog-heading"><span class="eyebrow">YOUR GARDEN</span><button data-close="settingsDialog" class="icon-button" aria-label="关闭页面设置"><svg><use href="#i-close"/></svg></button></div><h2 id="settingsTitle">页面设置</h2><form id="settingsForm"><label>花园名称<input id="settingBrand" required></label><label>标题第一行<input id="settingTitle1" required></label><label>标题第二行<input id="settingTitle2"></label><label>花园介绍<textarea id="settingDescription" rows="3"></textarea></label><label>园中品种数<input id="settingCount"></label><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>重新读取最新花园 · 保留输入</button><button type="button" class="reauth-draft" hidden>重新验证身份 · 保留输入</button></div><button class="primary-button" type="submit">保存页面设置 →</button></form></dialog>
+  <dialog id="confirmDialog" class="edit-dialog confirm-dialog" aria-labelledby="confirmTitle"><h2 id="confirmTitle">确认操作</h2><p id="confirmMessage"></p><div class="confirm-actions"><button type="button" id="confirmCancel">保留，返回</button><button type="button" id="confirmAccept" class="danger-button">确认删除</button></div></dialog>
+  <datalist id="speciesOptions"><option value="Japonica"><option value="Sasanqua"><option value="Reticulata"><option value="NRH"><option value="Wabisuke"><option value="Rusticana"></datalist>
+  <button id="mobileAddPhoto" class="mobile-add-photo" data-admin hidden>＋ 添加一组照片</button>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script defer src="catalog.js"></script>
+<script defer src="vendor/exifr.js"></script>
+<script defer src="src/model.js"></script>
+<script defer src="src/photo-io.js"></script>
+<script defer src="src/github-store.js"></script>
+<script defer src="src/controller.js"></script>
+</body>
+</html>
