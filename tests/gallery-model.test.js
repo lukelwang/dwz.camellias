@@ -19,6 +19,19 @@ test('visitor mutation is denied while authenticated proposal does not change sa
  model.accept(proposal.document);
  assert.equal(model.getState().albums[0].notes,'新备注');
 });
+test('record links default to visible and the owner can persist visibility without changing albums',()=>{
+ const model=scope.window.CamelliaModel.create(seed());
+ assert.equal(model.getState().settings.showCultivarRecordLinks,true);
+ assert.equal(model.propose({type:'PATCH_SETTINGS',patch:{showCultivarRecordLinks:false}}).error,true);
+ model.setAuthenticated(true);
+ const original=plain(model.document().albums);
+ const hidden=model.propose({type:'PATCH_SETTINGS',patch:{showCultivarRecordLinks:false}});
+ assert.equal(hidden.document.settings.showCultivarRecordLinks,false);
+ assert.equal(model.getState().settings.showCultivarRecordLinks,true);
+ model.accept(hidden.document);
+ assert.equal(model.getState().settings.showCultivarRecordLinks,false);
+ assert.deepEqual(plain(model.document().albums),original);
+});
 test('adding a batch preserves owner metadata and deletion updates the cover only on accept',()=>{
  const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
  const added=model.propose({type:'ADD_PHOTOS',cultivar:{id:'pearl',name:"Nuccio's Pearl",display_name:'源网站名称',notes:'源网站备注'},photos:[{id:'three',caption:'新花',frame:null}]});

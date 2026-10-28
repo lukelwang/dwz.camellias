@@ -25,11 +25,17 @@ Favorites have been removed. The **Sort by** menu lists Random order, Newly adde
 
 Gallery cards and album stages show centered square crops for portrait and landscape photos. Fullscreen viewing shows the complete image; saved photo files are unchanged.
 
+## Photo display controls
+
+Garden settings includes **Show cultivar record links** and **Watermark text**. The link switch controls only the source-record link in cultivar albums. Watermarks are display layers across photo views; blank text uses the garden name. Original stored JPEGs remain unchanged. Common context-menu saves, image drags, mobile image callouts and browser page-save shortcuts are discouraged, but screenshots and direct access to the public photo repository cannot be prevented.
+
+Choose a thumbnail in owner mode, then **Set as cover** above the thumbnail row. The cover is marked and saved for the gallery and initial album view; photo order stays editable separately. The homepage’s existing arrow switches to another photographed cultivar without opening a modal. Non-main species such as Hiemalis are available through **Other**, while real species labels remain in the records.
+
 ## Photos and durable changes
 
 Select one cultivar from the live catalogue or your saved albums, choose multiple images, check captions and dates, then save. Saved cultivars are marked **In your garden · Add photos**; selecting one appends the batch to the same album, preserving its cover and details. The browser generates a display JPEG (up to 2560 pixels on its longest edge) and a thumbnail (up to 640 pixels). The original files stay in your photo library; this is a gallery rather than an original-photo archive. Capture time comes from EXIF DateTimeOriginal, is shown in the camera's local time, and can be edited. Missing capture dates stay blank. Generated JPEGs do not retain embedded EXIF/GPS; capture time and its source remain in the album index.
 
-A batch's images, thumbnails, and `gallery.json` are saved in one Git commit. Only a confirmed GitHub branch update counts as success. Interrupted/failed saves keep the pending selection. Concurrent changes are rejected; use the explicit reload control before retrying. Album details, page settings, cover/order and deletions use the same durable save path. Deletions remove current files; older Git commits retain recovery history.
+Upload progress counts photographs rather than the paired JPEG/thumbnail files. A batch's images, thumbnails, and `gallery.json` are saved in one Git commit. Only a confirmed GitHub branch update counts as success. Interrupted/failed saves keep the pending selection. Concurrent changes are rejected; use the explicit reload control before retrying. Album details, page settings, cover/order and deletions use the same durable save path. Deletions remove current files; older Git commits retain recovery history.
 
 Public loading resolves the current commit through the GitHub API, then reads immutable JSON and image URLs from that same commit. This avoids stale branch URLs at the raw CDN. Newly saved content appears in the owner's current page after confirmed save; other browsers reload the current public snapshot. No service worker or application cache is used.
 

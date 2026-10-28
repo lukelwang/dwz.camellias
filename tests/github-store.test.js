@@ -228,6 +228,23 @@ test('new photos and Unicode metadata publish through one tree, commit and non-f
   assert.match(progress.at(-1), /GitHub/);
 });
 
+test('upload progress counts four photos rather than their eight image files', async () => {
+  const ids = ['one', 'two', 'three', 'four'];
+  for (const interleaved of [false, true]) {
+    const github = new GitHub();
+    const store = github.store();
+    await store.login(TOKEN);
+    const pairs = ids.map(filesFor);
+    const files = interleaved ? [...pairs.map(pair => pair[0]), ...pairs.map(pair => pair[1])] : pairs.flat();
+    const progress = [];
+    const result = await store.save(withPhotos(...ids), { files, onProgress: text => progress.push(text) });
+    assert.deepEqual(progress.filter(text => text.startsWith('Uploading photo ')), ids.map((_, index) => `Uploading photo ${index + 1}/4…`));
+    assert.equal(result.document.albums[0].photos.length, 4);
+    assert.equal(github.trees[0].tree.filter(entry => entry.path.startsWith('photos/')).length, 8);
+    assert.equal(progress.at(-1), 'Saved to GitHub.');
+  }
+});
+
 test('stale head rejects before uploading anything and leaves draft untouched', async () => {
   const github = new GitHub();
   const store = github.store();
@@ -320,6 +337,29 @@ test('metadata, cover and order edits persist without touching image blobs', asy
   await store.save(next);
   assert.deepEqual(github.trees[0].tree.map(item => item.path), ['gallery.json']);
   assert.deepEqual(JSON.parse(Buffer.from(github.blobs.at(-1).content, 'base64')), next);
+});
+
+test('cultivar record link visibility persists and legacy settings remain readable', async () => {
+  const github = new GitHub(withPhotos('one'));
+  const store = github.store();
+  const login = await store.login(TOKEN);
+  assert.equal(login.document.settings.showCultivarRecordLinks, undefined);
+  for (const visible of [false, true]) {
+    const next = clone(github.document);
+    next.settings.showCultivarRecordLinks = visible;
+    next.settings.watermarkText = visible ? '© 花园 — My garden' : '<watermark text>';
+    await store.save(next);
+    assert.equal(github.document.settings.showCultivarRecordLinks, visible);
+    assert.deepEqual(github.trees.at(-1).tree.map(entry => entry.path), ['gallery.json']);
+    assert.equal(github.document.albums[0].photos.length, 1);
+    assert.equal(github.document.settings.watermarkText, next.settings.watermarkText);
+  }
+  const invalid = clone(github.document);
+  invalid.settings.showCultivarRecordLinks = 'false';
+  await assert.rejects(store.save(invalid), { code: 'VALIDATION' });
+  invalid.settings.showCultivarRecordLinks = false;
+  invalid.settings.watermarkText = 123;
+  await assert.rejects(store.save(invalid), { code: 'VALIDATION' });
 });
 
 test('legacy frames remain readable and an ordinary frame-free document saves with the same schema', async () => {

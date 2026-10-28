@@ -5,7 +5,7 @@
   const SETTINGS = {
     brand: 'DWZ Camellias', titleLine1: 'Every bloom,', titleLine2: 'a moment kept.',
     description: 'A garden of more than 400 camellia cultivars.\nPhotographed, remembered, and grown with care.',
-    gardenCount: '400+'
+    gardenCount: '400+', showCultivarRecordLinks: true, watermarkText: ''
   };
   const ALBUM_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'notes', 'registeredYear'];
   const PHOTO_FIELDS = ['caption', 'takenAt', 'dateSource', 'dateOffset'];

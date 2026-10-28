@@ -71,6 +71,8 @@
       check(document && document.schemaVersion === 1, 'This garden data version is not supported. Update the app and try again.');
       check(document.settings && !Array.isArray(document.settings));
       for (const field of ['brand', 'titleLine1', 'titleLine2', 'description', 'gardenCount']) check(typeof document.settings[field] === 'string');
+      check(document.settings.showCultivarRecordLinks === undefined || typeof document.settings.showCultivarRecordLinks === 'boolean');
+      check(document.settings.watermarkText === undefined || typeof document.settings.watermarkText === 'string');
       check(Array.isArray(document.albums));
       const albumIds = new Set();
       const photoIds = new Set();
@@ -211,10 +213,14 @@
       check(Array.isArray(files) && Array.isArray(removePaths));
       check(typeof message === 'string' && message.trim() && message.length <= 500);
       const uploadPaths = new Set();
+      const photoUploads = new Map();
       for (const file of files) {
         check(file && PHOTO_PATH.test(file.path) && next.has(file.path) && !uploadPaths.has(file.path), 'An upload photo path is invalid or duplicated.');
         check(file.blob && typeof file.blob.arrayBuffer === 'function' && file.blob.type === 'image/jpeg' && file.blob.size > 0, 'Upload processed JPEG photos.');
         uploadPaths.add(file.path);
+        const photoId = file.path.split('/')[1];
+        if (!photoUploads.has(photoId)) photoUploads.set(photoId, []);
+        photoUploads.get(photoId).push(file);
       }
       for (const path of next) check(previous.has(path) || uploadPaths.has(path), 'A new photo is missing its image or thumbnail.');
       for (const path of removePaths) check(PHOTO_PATH.test(path) && previous.has(path) && !next.has(path), 'A photo selected for deletion has an invalid path or is still in use.');
@@ -225,13 +231,16 @@
       try {
         if (await head(current.token, current) !== current.commit) throw failure('CONFLICT', 'The garden was updated elsewhere. Keep the photos ready to upload and reload the data.');
         const entries = [];
-        for (let index = 0; index < files.length; index++) {
-          progress('Uploading photo ' + (index + 1) + '/' + files.length + '…');
-          let bytes;
-          try { bytes = new Uint8Array(await files[index].blob.arrayBuffer()); }
-          catch (_) { throw failure('VALIDATION', 'Could not read a photo selected for upload. Please choose it again.'); }
-          const blob = await authenticated('/git/blobs', { method: 'POST', body: { content: base64(bytes), encoding: 'base64' } });
-          entries.push({ path: files[index].path, mode: '100644', type: 'blob', sha: validSha(blob.sha) });
+        let photoNumber = 0;
+        for (const photoFiles of photoUploads.values()) {
+          progress('Uploading photo ' + (++photoNumber) + '/' + photoUploads.size + '…');
+          for (const file of photoFiles) {
+            let bytes;
+            try { bytes = new Uint8Array(await file.blob.arrayBuffer()); }
+            catch (_) { throw failure('VALIDATION', 'Could not read a photo selected for upload. Please choose it again.'); }
+            const blob = await authenticated('/git/blobs', { method: 'POST', body: { content: base64(bytes), encoding: 'base64' } });
+            entries.push({ path: file.path, mode: '100644', type: 'blob', sha: validSha(blob.sha) });
+          }
         }
         progress('Saving garden data…');
         const json = JSON.stringify(document, null, 2) + '\n';
