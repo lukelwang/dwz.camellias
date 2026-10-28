@@ -158,13 +158,12 @@
       }
     }
     const hexName = Array.from(new TextEncoder().encode(metadata.name), byte => byte.toString(16).padStart(2, '0')).join('');
-    const chineseName = metadata.chinese_name.find(name => /\p{Script=Han}/u.test(name));
     return {
       id: 'camellia-library-' + hexName,
       ...metadata,
       size: raw.size || '',
       description: raw.description || '',
-      display_name: chineseName || metadata.name,
+      display_name: metadata.name,
       summary_zh: '',
       color: '',
       form: '',
