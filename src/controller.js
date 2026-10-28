@@ -452,6 +452,7 @@
     mark.style.right = Math.max(12, bounds.right - right + 12) + 'px';
     mark.style.bottom = Math.max(12, bounds.bottom - bottom + 12) + 'px';
     mark.style.maxWidth = Math.max(0, width - 24) + 'px';
+    mark.style.fontSize = Math.min(12, Math.min(width, height) * .024) + 'px';
     mark.style.visibility = 'visible';
   }
   function renderLightbox() {
