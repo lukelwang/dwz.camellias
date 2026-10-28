@@ -87,6 +87,7 @@ textarea { resize: vertical; }
 }
 .edit-dialog textarea { min-height: 104px; }
 .edit-dialog input[type="hidden"] { display: none; }
+.editor-add-photos { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 12px; border: 1px solid #65764d; border-radius: 4px; background: #20291c; color: #d7e4c2; font-size: 14px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
 .edit-dialog h3 { font-size: 15px; font-weight: 500; line-height: 1.6; margin: 3px 0 0; }
 .primary-button { min-height: 48px; font-size: 14px; line-height: 1.5; border-radius: 4px; }

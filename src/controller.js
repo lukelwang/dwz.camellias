@@ -62,6 +62,7 @@
   }
   function status(message, retry = false, error = false) {
     $('#storeMessage').textContent = message;
+    $('#storeStatus').hidden = !message;
     $('#reloadGallery').hidden = !retry;
     $('#storeStatus').classList.toggle('has-error', error);
     $$('.save-message').forEach(element => { element.textContent = message; });
@@ -118,7 +119,7 @@
       model.accept(document); recoveryRequired = false;
       if (isManagerPage && selected) setSelected(existingAlbum(selected) || selected);
       const reconciled = reconcilePending(document);
-      status('Garden updated.' + reconciled + (dirtyDialogs.size || pending.length ? ' Your edits and pending photos are preserved. Review the latest content before saving.' : ''));
+      status((reconciled + (dirtyDialogs.size || pending.length ? ' Your edits and pending photos are preserved. Review the latest content before saving.' : '')).trim());
     } catch (error) { status(error.message || 'Could not load the garden. Please try again.', true, true); }
     finally { loading = false; lockUI(); render(); updateUpload(); }
   }
@@ -488,7 +489,7 @@
     if (!next) return;
     const album = next.albums.find(item => item.id === target.id || item.name === target.name);
     dirtyDialogs.delete('uploadDialog'); closeDialog('uploadDialog');
-    if (album) openAlbum(album.id, photos[0]?.id);
+    if (album && !($('#albumEditDialog').open && $('#editingAlbumId').value === album.id)) openAlbum(album.id, photos[0]?.id);
   }
 
   function openAlbumEdit(id) {
@@ -496,6 +497,7 @@
     const album = getAlbum(id);
     if (!album) return;
     $('#editingAlbumId').value = id;
+    $('#editAlbumAddPhotos').dataset.addTo = id;
     $('#editDisplayName').value = album.display_name || album.name;
     $('#editCanonicalName').value = album.name;
     $('#editSpecies').value = album.species || '';
