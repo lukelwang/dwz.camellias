@@ -22,4 +22,6 @@ Physical iPhone Photos picker and HEIC decoding still need the owner's device. N
 
 ## Deployment
 
-Pending final GitHub Pages verification.
+GitHub Pages source switched to `main` and build succeeded for runtime commit `48fd3987cf4aace1b6a4b14f5024927cdf1ef96d`. Public HTML matched the local index byte-for-byte (18,796 bytes); browser loaded the real public empty gallery and token help over HTTPS at390px with no errors or overflow. Production no longer contains the public demo token or reset action. Photo repository has only main and its initial empty index; no test photos remain in the published gallery. Verified on 2026-10-28.
+
+The desktop preview handoff was queued by the app; the public URL is also provided directly in the handoff message. The previous prototype remains recoverable on its separate repository branch.

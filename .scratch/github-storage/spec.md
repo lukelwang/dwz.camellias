@@ -1,6 +1,6 @@
 # GitHub-backed camellia gallery
 
-Status: implemented and verified; deployment pending
+Status: complete — production deployed and verified
 
 User authorized creation of public `lukelwang/dwz.camellias.photo`, real owner-only PAT login, durable multi-photo upload, and deployment to the existing public gallery. Keep original Noir and phone-first selection. Production is independent of the preserved prototype branch; do not retain reset-to-demo or public demo authorization.
 
