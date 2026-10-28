@@ -105,7 +105,10 @@ html[data-dark="true"] .site-header { height: auto; min-height: 96px; gap: 24px;
 .site-header .brand > span { font-size: 20px; line-height: 1.45; }
 .site-header nav { gap: 24px; font-size: 14px; }
 .site-header nav > a, .site-header nav > button { min-height: 44px; }
-.site-header nav .active::after { bottom: 0; }
+.nav-tabs { display: flex; align-items: flex-end; gap: 6px; border-bottom: 1px solid var(--ui-border); }
+.nav-tabs > a, .nav-tabs > button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; margin-bottom: -1px; padding: 10px 16px; border: 1px solid var(--ui-border); border-radius: 9px 9px 0 0; background: transparent; color: var(--ui-muted); white-space: nowrap; }
+html[data-dark="true"] .site-header nav .active { border-color: #7d9069; border-bottom-color: var(--ui-hover); background: var(--ui-hover); color: var(--ui-accent); }
+.site-header nav .active::after { content: none; }
 .header-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .header-tools > button:not(.header-add) { padding-inline: 12px; background: transparent; font-size: 13px; }
 .header-tools .login-entry { border-color: transparent; }

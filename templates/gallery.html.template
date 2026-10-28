@@ -37,8 +37,10 @@
   <header class="site-header page-width">
     <a class="brand" href="#" aria-label="DWZ Camellias home"><svg><use href="#i-flower"/></svg><span>DWZ Camellias</span></a>
     <nav aria-label="Main navigation">
-      <a href="#collection" class="nav-gallery active">The collection</a>
-      <button class="nav-favorites">Favorites <span id="navFavoriteCount">0</span></button>
+      <div class="nav-tabs">
+        <a href="#collection" class="nav-gallery active">The collection</a>
+        <button class="nav-favorites">Favorites <span id="navFavoriteCount">0</span></button>
+      </div>
       <a href="https://camellia-nomenclature.github.io/" target="_blank" rel="noopener noreferrer" class="nav-source">Cultivar catalogue <svg><use href="#i-external"/></svg></a>
     </nav>
     <!-- OWNER_START -->
