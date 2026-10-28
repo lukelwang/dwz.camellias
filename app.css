@@ -105,6 +105,7 @@ html[data-dark="true"] .site-header { height: auto; min-height: 96px; gap: 24px;
 .site-header .brand > span { font-size: 20px; line-height: 1.45; }
 .site-header nav { gap: 24px; font-size: 14px; }
 .site-header nav > a, .site-header nav > button { min-height: 44px; }
+.site-header nav .active::after { bottom: 0; }
 .header-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .header-tools > button:not(.header-add) { padding-inline: 12px; background: transparent; font-size: 13px; }
 .header-tools .login-entry { border-color: transparent; }
@@ -320,7 +321,6 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
   .site-header .brand { flex: 1 1 100%; }
   .site-header .brand > span { font-size: 18px; letter-spacing: .5px; }
   .site-header nav { order: 2; flex: 1 1 100%; gap: 24px; height: 44px; min-height: 44px; font-size: 14px; }
-  .site-header nav .active::after { bottom: 0; }
   .header-tools { order: 1; width: 100%; justify-content: flex-start; gap: 8px; }
   .header-tools > button:not(.header-add) { font-size: 13px; }
   #adminBadge, .header-tools .header-add { display: none; }
