@@ -259,6 +259,13 @@ html[data-dark="true"] .album-dialog { width: min(1130px, calc(100% - 64px)); ma
 .store-status.has-error { background: #2a201b; color: var(--ui-danger); }
 
 /* Existing immersive imagery stays intact; secondary copy becomes readable. */
+html[data-dark="true"] .hero { border-bottom-color: transparent; }
+html[data-dark="true"] .hero-art-shade {
+  background:
+    linear-gradient(90deg, #101310 0%, #101310f0 23%, #101310a3 46%, #10131005 70%),
+    linear-gradient(180deg, #101310 0%, #10131000 14%, #10131000 78%, #101310 100%),
+    linear-gradient(270deg, #101310 0%, #10131000 10%);
+}
 html[data-dark="true"] .eyebrow { font-size: 11px; line-height: 1.5; letter-spacing: 2px; }
 html[data-dark="true"] .hero-description { font-size: 15px; line-height: 1.9; }
 html[data-dark="true"] .hero-stats > div > span { font-size: 11px; line-height: 1.6; }
@@ -319,6 +326,12 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
   #adminBadge, .header-tools .header-add { display: none; }
   .header-tools:has(> :not([hidden])) { margin-top: 4px; }
   html[data-dark="true"] .hero-description { font-size: 14px; line-height: 1.85; }
+  html[data-dark="true"] .hero-art-shade {
+    background:
+      linear-gradient(90deg, #101310e8, #10131065),
+      linear-gradient(180deg, #101310 0%, #10131000 16%, #10131000 76%, #101310 100%),
+      linear-gradient(270deg, #101310a3 0%, #10131000 12%);
+  }
   html[data-dark="true"] .hero-art-top { display: none; }
   html[data-dark="true"] .hero h1 { font-size: clamp(40px, 11vw, 49px); line-height: 1.25; }
   html[data-dark="true"] .hero-stats { gap: 22px; }
