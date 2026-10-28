@@ -12,15 +12,15 @@
     return Object.assign(new Error(message), { code });
   }
   function check(condition, message) {
-    if (!condition) throw failure('VALIDATION', message || '花园资料格式不正确。');
+    if (!condition) throw failure('VALIDATION', message || 'Garden data is invalid.');
   }
   function jsonCopy(value) {
     const seen = new Set();
     function visit(item, depth) {
-      check(depth < 40, '花园资料层级过深。');
+      check(depth < 40, 'Garden data is nested too deeply.');
       if (item === null || typeof item === 'boolean') return;
       if (typeof item === 'string') {
-        check(!/^\s*(?:blob|data):/i.test(item), '请先上传照片，再保存花园资料。');
+        check(!/^\s*(?:blob|data):/i.test(item), 'Upload photos before saving garden data.');
         return;
       }
       if (typeof item === 'number') { check(Number.isFinite(item)); return; }
@@ -59,16 +59,16 @@
     let visibleCommit = null;
 
     function photoURL(path) {
-      check(typeof path === 'string' && PHOTO_PATH.test(path), '照片路径不正确。');
+      check(typeof path === 'string' && PHOTO_PATH.test(path), 'Invalid photo path.');
       return raw + path;
     }
     function displayURL(path) {
-      check(typeof path === 'string' && PHOTO_PATH.test(path), '照片路径不正确。');
+      check(typeof path === 'string' && PHOTO_PATH.test(path), 'Invalid photo path.');
       return rawRoot + (visibleCommit || options.branch) + '/' + path;
     }
     function validate(value) {
       const document = jsonCopy(value);
-      check(document && document.schemaVersion === 1, '此花园资料版本不受支持；请更新应用后再试。');
+      check(document && document.schemaVersion === 1, 'This garden data version is not supported. Update the app and try again.');
       check(document.settings && !Array.isArray(document.settings));
       for (const field of ['brand', 'titleLine1', 'titleLine2', 'description', 'gardenCount']) check(typeof document.settings[field] === 'string');
       check(Array.isArray(document.albums));
@@ -83,7 +83,7 @@
           photoIds.add(photo.id);
           check(photo.kind === 'personal');
           check(photo.imagePath === 'photos/' + photo.id + '/image.jpg' && photo.thumbnailPath === 'photos/' + photo.id + '/thumbnail.jpg');
-          check(photo.src === photoURL(photo.imagePath) && photo.thumbnailSrc === photoURL(photo.thumbnailPath), '照片地址必须指向花园的公开照片仓库。');
+          check(photo.src === photoURL(photo.imagePath) && photo.thumbnailSrc === photoURL(photo.thumbnailPath), 'Photo URLs must point to the garden’s public photo repository.');
           for (const field of ['filename', 'caption', 'takenAt', 'dateSource', 'dateOffset', 'mime']) check(typeof photo[field] === 'string');
           check(photo.mime === 'image/jpeg');
           for (const field of ['width', 'height', 'size']) check(Number.isSafeInteger(photo[field]) && photo[field] > 0);
@@ -97,12 +97,12 @@
       return new Set(document.albums.flatMap(album => album.photos.flatMap(photo => [photo.imagePath, photo.thumbnailPath])));
     }
     function active(current) {
-      if (session !== current) throw failure('AUTH', '登录已失效，请重新登录。');
+      if (session !== current) throw failure('AUTH', 'Your session has expired. Please sign in again.');
     }
     // This is the only authenticated transport. Never follow a redirect with a PAT.
     async function request(path, { token, method = 'GET', body, current, attempt, accept = 'application/vnd.github+json' } = {}) {
       if (current) active(current);
-      if (attempt !== undefined && generation !== attempt) throw failure('AUTH', '登录已取消，请重新登录。');
+      if (attempt !== undefined && generation !== attempt) throw failure('AUTH', 'Sign-in was canceled. Please sign in again.');
       const url = path === '/user' ? 'https://api.github.com/user' : api + path;
       const headers = { Accept: accept, 'X-GitHub-Api-Version': '2022-11-28' };
       if (token) headers.Authorization = 'Bearer ' + token;
@@ -111,29 +111,29 @@
         const delay = lastWrite + writeInterval - Date.now();
         if (delay > 0) await new Promise(resolve => root.setTimeout(resolve, delay));
         if (current) active(current);
-        if (attempt !== undefined && generation !== attempt) throw failure('AUTH', '登录已取消，请重新登录。');
+        if (attempt !== undefined && generation !== attempt) throw failure('AUTH', 'Sign-in was canceled. Please sign in again.');
         lastWrite = Date.now();
       }
       let response;
       try {
         response = await fetcher(url, { method, headers, credentials: 'omit', redirect: 'error', cache: 'no-store', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       } catch (_) {
-        throw failure('NETWORK', '无法连接 GitHub，请检查网络后重试。');
+        throw failure('NETWORK', 'Could not connect to GitHub. Check your network and try again.');
       }
       if (!response.ok) {
         const retryAfter = response.headers?.get?.('retry-after');
         const remaining = response.headers?.get?.('x-ratelimit-remaining');
-        if (response.status === 429 || (response.status === 403 && (retryAfter || remaining === '0'))) throw failure('RATE_LIMIT', 'GitHub 请求过于频繁。请保留待上传照片，稍后再保存。');
-        if (response.status === 401) throw failure('AUTH', 'GitHub 密钥无效或已过期。');
-        if (response.status === 403 || response.status === 404) throw failure('PERMISSION', '无法访问照片仓库；请检查密钥的 Contents 读写权限。');
-        if (response.status === 409 || response.status === 422) throw failure('CONFLICT', '仓库已发生变化，请刷新资料后重试。');
-        throw failure('NETWORK', 'GitHub 暂时无法完成请求，请稍后重试。');
+        if (response.status === 429 || (response.status === 403 && (retryAfter || remaining === '0'))) throw failure('RATE_LIMIT', 'GitHub requests are being made too quickly. Keep the photos ready to upload and try again later.');
+        if (response.status === 401) throw failure('AUTH', 'The GitHub token is invalid or expired.');
+        if (response.status === 403 || response.status === 404) throw failure('PERMISSION', 'Cannot access the photo repository. Check that the token has Contents read and write access.');
+        if (response.status === 409 || response.status === 422) throw failure('CONFLICT', 'The repository has changed. Reload the data and try again.');
+        throw failure('NETWORK', 'GitHub could not complete the request. Please try again later.');
       }
       try { return await response.json(); }
-      catch (_) { throw failure('NETWORK', 'GitHub 返回了无法读取的结果，请稍后重试。'); }
+      catch (_) { throw failure('NETWORK', 'GitHub returned an unreadable response. Please try again later.'); }
     }
     function validSha(value) {
-      if (typeof value !== 'string' || !SHA.test(value)) throw failure('NETWORK', 'GitHub 返回了无法确认的版本。');
+      if (typeof value !== 'string' || !SHA.test(value)) throw failure('NETWORK', 'GitHub returned an unrecognized revision.');
       return value;
     }
     async function head(token, current, attempt) {
@@ -152,13 +152,13 @@
     }
     async function loadPublic() {
       if (session) {
-        if (busy) throw failure('CONFLICT', '保存正在进行，请等待完成后刷新。');
+        if (busy) throw failure('CONFLICT', 'A save is in progress. Wait for it to finish before refreshing.');
         const current = session;
         const baseline = current.commit;
         // Conflict recovery reads a coherent commit using only the GitHub API.
         const latest = await snapshot(current.token, current);
         active(current);
-        if (busy || current.commit !== baseline) throw failure('CONFLICT', '保存正在进行或刚刚完成，请重新刷新。');
+        if (busy || current.commit !== baseline) throw failure('CONFLICT', 'A save is in progress or just finished. Please refresh again.');
         Object.assign(current, { commit: latest.commit, tree: latest.tree, document: latest.document });
         visibleCommit = latest.commit;
         return jsonCopy(latest.document);
@@ -171,28 +171,28 @@
       let response;
       try {
         response = await fetcher(rawRoot + commit + '/gallery.json', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
-      } catch (_) { throw failure('NETWORK', '无法加载公开花园，请检查网络后重试。'); }
-      if (!response.ok) throw failure('NETWORK', '暂时无法加载公开花园，请稍后重试。');
+      } catch (_) { throw failure('NETWORK', 'Could not load the public garden. Check your network and try again.'); }
+      if (!response.ok) throw failure('NETWORK', 'The public garden is temporarily unavailable. Please try again later.');
       let document;
       try { document = await response.json(); }
-      catch (_) { throw failure('VALIDATION', '公开花园资料无法读取。'); }
+      catch (_) { throw failure('VALIDATION', 'Could not read the public garden data.'); }
       const validated = validate(document);
-      if (generation !== attempt || visibleCommit !== previousVisible) throw failure('CONFLICT', '花园状态已更新，请重新刷新。');
+      if (generation !== attempt || visibleCommit !== previousVisible) throw failure('CONFLICT', 'The garden has been updated. Please refresh again.');
       visibleCommit = commit;
       return validated;
     }
     async function login(token) {
       logout();
       const attempt = generation;
-      if (typeof token !== 'string' || !token.trim() || /[\s\x00-\x1f\x7f]/.test(token)) throw failure('AUTH', '请输入有效的 GitHub 密钥。');
+      if (typeof token !== 'string' || !token.trim() || /[\s\x00-\x1f\x7f]/.test(token)) throw failure('AUTH', 'Enter a valid GitHub token.');
       const user = await request('/user', { token, attempt });
-      if (user.id !== options.ownerId || typeof user.login !== 'string' || user.login.toLowerCase() !== options.owner.toLowerCase()) throw failure('AUTH', '只有花园所有者可以管理照片。');
+      if (user.id !== options.ownerId || typeof user.login !== 'string' || user.login.toLowerCase() !== options.owner.toLowerCase()) throw failure('AUTH', 'Only the garden owner can manage photos.');
       const repository = await request('', { token, attempt });
-      if (repository.owner?.id !== options.ownerId || repository.owner?.login?.toLowerCase() !== options.owner.toLowerCase() || repository.name !== options.repo || repository.private !== false) throw failure('PERMISSION', '照片仓库的所有者或公开状态不符合要求。');
+      if (repository.owner?.id !== options.ownerId || repository.owner?.login?.toLowerCase() !== options.owner.toLowerCase() || repository.name !== options.repo || repository.private !== false) throw failure('PERMISSION', 'The photo repository owner or visibility does not meet the requirements.');
       const { commit, tree, document, content } = await snapshot(token, undefined, attempt);
       // A dangling blob proves Contents:write for this repository, without a commit.
       validSha((await request('/git/blobs', { token, attempt, method: 'POST', body: { content, encoding: 'base64' } })).sha);
-      if (generation !== attempt) throw failure('AUTH', '登录已取消，请重新登录。');
+      if (generation !== attempt) throw failure('AUTH', 'Sign-in was canceled. Please sign in again.');
       session = { token, commit, tree, document };
       visibleCommit = commit;
       return { document: jsonCopy(document), user: { id: user.id, login: user.login }, commit };
@@ -203,8 +203,8 @@
       session = null;
     }
     async function save(value, { files = [], removePaths = [], message = 'Update camellia gallery', onProgress } = {}) {
-      if (!session) throw failure('AUTH', '请先登录花园所有者账号。');
-      if (busy) throw failure('CONFLICT', '另一项保存正在进行，请等待完成。');
+      if (!session) throw failure('AUTH', 'Sign in with the garden owner account first.');
+      if (busy) throw failure('CONFLICT', 'Another save is in progress. Please wait for it to finish.');
       const current = session;
       const document = validate(value);
       const previous = paths(current.document);
@@ -213,52 +213,52 @@
       check(typeof message === 'string' && message.trim() && message.length <= 500);
       const uploadPaths = new Set();
       for (const file of files) {
-        check(file && PHOTO_PATH.test(file.path) && next.has(file.path) && !uploadPaths.has(file.path), '待上传照片路径不正确或重复。');
-        check(file.blob && typeof file.blob.arrayBuffer === 'function' && file.blob.type === 'image/jpeg' && file.blob.size > 0, '请上传处理后的 JPEG 照片。');
+        check(file && PHOTO_PATH.test(file.path) && next.has(file.path) && !uploadPaths.has(file.path), 'An upload photo path is invalid or duplicated.');
+        check(file.blob && typeof file.blob.arrayBuffer === 'function' && file.blob.type === 'image/jpeg' && file.blob.size > 0, 'Upload processed JPEG photos.');
         uploadPaths.add(file.path);
       }
-      for (const path of next) check(previous.has(path) || uploadPaths.has(path), '新增照片缺少图像或缩略图。');
-      for (const path of removePaths) check(PHOTO_PATH.test(path) && previous.has(path) && !next.has(path), '删除的照片路径不正确或仍在使用。');
+      for (const path of next) check(previous.has(path) || uploadPaths.has(path), 'A new photo is missing its image or thumbnail.');
+      for (const path of removePaths) check(PHOTO_PATH.test(path) && previous.has(path) && !next.has(path), 'A photo selected for deletion has an invalid path or is still in use.');
       const deleted = [...previous].filter(path => !next.has(path));
       const progress = text => { if (typeof onProgress === 'function') { try { onProgress(text); } catch (_) {} } };
       const authenticated = (path, options = {}) => request(path, { ...options, token: current.token, current });
       busy = true;
       try {
-        if (await head(current.token, current) !== current.commit) throw failure('CONFLICT', '花园已在其他地方更新，请保留待上传照片并刷新资料。');
+        if (await head(current.token, current) !== current.commit) throw failure('CONFLICT', 'The garden was updated elsewhere. Keep the photos ready to upload and reload the data.');
         const entries = [];
         for (let index = 0; index < files.length; index++) {
-          progress('正在上传照片 ' + (index + 1) + '/' + files.length + '…');
+          progress('Uploading photo ' + (index + 1) + '/' + files.length + '…');
           let bytes;
           try { bytes = new Uint8Array(await files[index].blob.arrayBuffer()); }
-          catch (_) { throw failure('VALIDATION', '无法读取待上传照片，请重新选择。'); }
+          catch (_) { throw failure('VALIDATION', 'Could not read a photo selected for upload. Please choose it again.'); }
           const blob = await authenticated('/git/blobs', { method: 'POST', body: { content: base64(bytes), encoding: 'base64' } });
           entries.push({ path: files[index].path, mode: '100644', type: 'blob', sha: validSha(blob.sha) });
         }
-        progress('正在保存花园资料…');
+        progress('Saving garden data…');
         const json = JSON.stringify(document, null, 2) + '\n';
         const metadata = await authenticated('/git/blobs', { method: 'POST', body: { content: base64(new TextEncoder().encode(json)), encoding: 'base64' } });
         entries.push({ path: 'gallery.json', mode: '100644', type: 'blob', sha: validSha(metadata.sha) });
         for (const path of deleted) entries.push({ path, mode: '100644', type: 'blob', sha: null });
         const tree = validSha((await authenticated('/git/trees', { method: 'POST', body: { base_tree: current.tree, tree: entries } })).sha);
         const commit = validSha((await authenticated('/git/commits', { method: 'POST', body: { message, tree, parents: [current.commit] } })).sha);
-        if (await head(current.token, current) !== current.commit) throw failure('CONFLICT', '保存期间花园已更新，请保留修改并刷新资料后重试。');
+        if (await head(current.token, current) !== current.commit) throw failure('CONFLICT', 'The garden changed during the save. Keep your changes and reload the data before trying again.');
         try {
           const updated = await authenticated('/git/refs/heads/' + options.branch, { method: 'PATCH', body: { sha: commit, force: false } });
-          if (updated.object?.sha !== commit) throw failure('NETWORK', 'GitHub 尚未确认保存结果。');
+          if (updated.object?.sha !== commit) throw failure('NETWORK', 'GitHub has not confirmed the save.');
         } catch (error) {
           // A dropped response may follow a successful update. Confirm the exact ref.
           if (['CONFLICT', 'AUTH', 'PERMISSION', 'RATE_LIMIT'].includes(error.code)) throw error;
           let confirmed;
           try { confirmed = await head(current.token, current); }
-          catch (_) { throw failure('UNCERTAIN', '尚无法确认保存结果。请保留照片，恢复网络后重新登录核对。'); }
-          if (confirmed !== commit) throw failure('UNCERTAIN', '尚无法确认保存结果。请保留照片并重新登录核对，避免重复上传。');
+          catch (_) { throw failure('UNCERTAIN', 'The save result is still unknown. Keep the photos, restore your network, then sign in again to check.'); }
+          if (confirmed !== commit) throw failure('UNCERTAIN', 'The save result is still unknown. Keep the photos and sign in again to check before uploading again.');
         }
         active(current);
         current.commit = commit;
         current.tree = tree;
         current.document = document;
         visibleCommit = commit;
-        progress('已保存到 GitHub。');
+        progress('Saved to GitHub.');
         return { document: jsonCopy(document), commit };
       } finally { busy = false; }
     }

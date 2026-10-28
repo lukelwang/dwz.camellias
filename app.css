@@ -308,3 +308,7 @@ button { min-width:44px; }
 select { min-height:44px; }
 .favorite-button,.lightbox .photo-arrow { width:44px; height:44px; }
 .search-box input::placeholder { font-size:13px; }
+
+.studio-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:6px max(18px,calc((100vw - 1280px)/2)); border-bottom:1px solid var(--line); background:#151b13; color:#abb99a; font-size:11px; }
+.studio-bar > span { letter-spacing:2px; }
+.studio-bar > a { display:inline-flex; align-items:center; min-height:44px; color:#d1ddbd; }

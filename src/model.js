@@ -4,8 +4,8 @@
 
   const FRAME = { style: 'none', color: '#d6c29b', width: 5, radius: 12, padding: 8 };
   const SETTINGS = {
-    brand: '花间', titleLine1: '收藏花开，', titleLine2: '也收藏时光。',
-    description: '四百余种茶花，一个慢慢生长的花园。\n用镜头留住每一朵，独一无二的盛放。',
+    brand: 'DWZ Camellias', titleLine1: 'Every bloom,', titleLine2: 'a moment kept.',
+    description: 'A garden of more than 400 camellia cultivars.\nPhotographed, remembered, and grown with care.',
     gardenCount: '400+'
   };
   const ALBUM_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'notes'];
@@ -60,28 +60,28 @@
 
     function updateAlbum(id, transform, message) {
       const album = state.albums.find(item => item.id === id);
-      if (!album) return finish({}, '这个品种相册已不存在。', true);
+      if (!album) return finish({}, 'This cultivar album no longer exists.', true);
       return finish({ albums: state.albums.map(item => item.id === id ? transform(item) : item) }, message);
     }
 
     function dispatch(action) {
       const type = action.type;
       if (type === 'TOGGLE_FAVORITE') {
-        if (!state.albums.some(album => album.id === action.id)) return finish({}, '这个品种相册已不存在。', true);
+        if (!state.albums.some(album => album.id === action.id)) return finish({}, 'This cultivar album no longer exists.', true);
         const exists = state.favorites.includes(action.id);
-        return finish({ favorites: exists ? state.favorites.filter(id => id !== action.id) : [...state.favorites, action.id] }, exists ? '已取消收藏。' : '已收藏这个品种。');
+        return finish({ favorites: exists ? state.favorites.filter(id => id !== action.id) : [...state.favorites, action.id] }, exists ? 'Removed from favorites.' : 'Added this cultivar to favorites.');
       }
       if (ADMIN_ACTIONS.includes(type) && state.role !== 'admin') {
-        return finish({}, '请先验证管理员身份，再修改花园内容。', true);
+        return finish({}, 'Verify the owner account before editing the garden.', true);
       }
       if (type === 'PATCH_SETTINGS') {
-        return finish({ settings: { ...state.settings, ...select(action.patch || {}, Object.keys(SETTINGS)) } }, '已更新花园标题与介绍。');
+        return finish({ settings: { ...state.settings, ...select(action.patch || {}, Object.keys(SETTINGS)) } }, 'Garden title and description updated.');
       }
       if (type === 'ADD_PHOTOS') {
         const cultivar = typeof action.cultivar === 'string' ? { name: action.cultivar.trim() } : (action.cultivar || {});
         const existing = state.albums.find(album => (cultivar.id && album.id === cultivar.id) || (cultivar.name && album.name === cultivar.name));
-        if (!existing && !cultivar.name?.trim()) return finish({}, '请先选择或填写品种名称。', true);
-        if (!action.photos?.length) return finish({}, '请先选择照片。', true);
+        if (!existing && !cultivar.name?.trim()) return finish({}, 'Choose or enter a cultivar name first.', true);
+        if (!action.photos?.length) return finish({}, 'Choose at least one photo first.', true);
         let album = existing;
         if (!album) {
           let id = cultivar.id;
@@ -103,29 +103,29 @@
           };
         });
         const updated = { ...album, photos: [...album.photos, ...photos], coverPhotoId: album.coverPhotoId || photos[0].id };
-        return finish({ albums: existing ? state.albums.map(item => item.id === album.id ? updated : item) : [...state.albums, updated] }, `已向「${album.display_name || album.name}」加入 ${photos.length} 张照片。`);
+        return finish({ albums: existing ? state.albums.map(item => item.id === album.id ? updated : item) : [...state.albums, updated] }, `Added ${photos.length} photo${photos.length === 1 ? '' : 's'} to “${album.display_name || album.name}”.`);
       }
       if (type === 'PATCH_ALBUM') {
         const patch = select(action.patch || {}, ALBUM_FIELDS);
         if (Object.hasOwn(patch, 'name')) {
           patch.name = String(patch.name || '').trim();
-          if (!patch.name) return finish({}, '品种名称不能为空。', true);
-          if (state.albums.some(album => album.id !== action.id && album.name === patch.name)) return finish({}, '已有同名品种，请使用不同名称。', true);
+          if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
+          if (state.albums.some(album => album.id !== action.id && album.name === patch.name)) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
           patch.reference_url = sourceURL(patch.name);
         }
         return updateAlbum(action.id, album => ({
           ...album, ...patch,
           frame: Object.hasOwn(action.patch || {}, 'frame') ? frameCopy({ ...album.frame, ...(action.patch.frame || FRAME) }) : album.frame
-        }), '已更新品种资料。');
+        }), 'Cultivar details updated.');
       }
       if (type === 'DELETE_ALBUM') {
-        if (!state.albums.some(album => album.id === action.id)) return finish({}, '这个品种相册已不存在。', true);
-        return finish({ albums: state.albums.filter(album => album.id !== action.id), favorites: state.favorites.filter(id => id !== action.id) }, '已删除品种及相册中的全部照片。');
+        if (!state.albums.some(album => album.id === action.id)) return finish({}, 'This cultivar album no longer exists.', true);
+        return finish({ albums: state.albums.filter(album => album.id !== action.id), favorites: state.favorites.filter(id => id !== action.id) }, 'Cultivar and all its photos deleted.');
       }
       if (['PATCH_PHOTO', 'DELETE_PHOTO', 'SET_COVER', 'MOVE_PHOTO'].includes(type)) {
         const album = state.albums.find(item => item.id === action.albumId);
         const photo = album?.photos.find(item => item.id === action.photoId);
-        if (!photo) return finish({}, '这张照片已不存在。', true);
+        if (!photo) return finish({}, 'This photo no longer exists.', true);
         if (type === 'PATCH_PHOTO') {
           const patch = select(action.patch || {}, PHOTO_FIELDS);
           if (Object.hasOwn(patch, 'takenAt') && !patch.takenAt) {
@@ -135,26 +135,26 @@
           if (Object.hasOwn(action.patch || {}, 'frame')) {
             patch.frame = action.patch.frame == null ? null : frameCopy({ ...(photo.frame || album.frame), ...action.patch.frame });
           }
-          return updateAlbum(album.id, item => ({ ...item, photos: item.photos.map(current => current.id === photo.id ? { ...current, ...patch } : current) }), '已更新照片说明、拍摄时间或边框。');
+          return updateAlbum(album.id, item => ({ ...item, photos: item.photos.map(current => current.id === photo.id ? { ...current, ...patch } : current) }), 'Photo caption, capture date, or frame updated.');
         }
         if (type === 'DELETE_PHOTO') {
           return updateAlbum(album.id, item => {
             const photos = item.photos.filter(current => current.id !== photo.id);
             return { ...item, photos, coverPhotoId: item.coverPhotoId === photo.id ? (photos[0]?.id || null) : item.coverPhotoId };
-          }, '已删除照片；品种相册仍保留。');
+          }, 'Photo deleted. The cultivar album remains.');
         }
-        if (type === 'SET_COVER') return updateAlbum(album.id, item => ({ ...item, coverPhotoId: photo.id }), '已设为相册封面。');
-        if (action.direction !== -1 && action.direction !== 1) return finish({}, '请选择向前或向后移动照片。', true);
+        if (type === 'SET_COVER') return updateAlbum(album.id, item => ({ ...item, coverPhotoId: photo.id }), 'Set as album cover.');
+        if (action.direction !== -1 && action.direction !== 1) return finish({}, 'Choose whether to move the photo forward or backward.', true);
         const index = album.photos.indexOf(photo);
         const target = index + action.direction;
-        if (target < 0 || target >= album.photos.length) return finish({}, '照片已经在这个方向的尽头。');
+        if (target < 0 || target >= album.photos.length) return finish({}, 'The photo is already at the end in that direction.');
         return updateAlbum(album.id, item => {
           const photos = item.photos.slice();
           [photos[index], photos[target]] = [photos[target], photos[index]];
           return { ...item, photos };
-        }, '已调整照片顺序。');
+        }, 'Photo order updated.');
       }
-      return finish({}, '这个操作暂不支持。', true);
+      return finish({}, 'This action is not supported yet.', true);
     }
 
     function documentValue(value = state) {

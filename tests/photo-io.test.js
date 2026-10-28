@@ -38,16 +38,16 @@ test('decoded images above 100 million pixels are rejected before canvas work', 
 test('input validation accepts image formats and rejects non-images and oversized files', function () {
   assert.equal(photoIO.validImageFile({ size: 1, type: 'image/heic', name: 'garden.heic' }), '');
   assert.equal(photoIO.validImageFile({ size: 1, type: '', name: 'garden.HEIF' }), '');
-  assert.equal(photoIO.validImageFile({ size: 1, type: 'text/plain', name: 'notes.txt' }), '请选择图片文件。');
-  assert.equal(photoIO.validImageFile({ size: 50 * 1024 * 1024 + 1, type: 'image/jpeg', name: 'large.jpg' }), '单张照片不能超过 50 MB。');
-  assert.equal(photoIO.validImageFile({ size: 0, type: 'image/jpeg', name: 'empty.jpg' }), '这张图片是空文件。');
+  assert.equal(photoIO.validImageFile({ size: 1, type: 'text/plain', name: 'notes.txt' }), 'Choose an image file.');
+  assert.equal(photoIO.validImageFile({ size: 50 * 1024 * 1024 + 1, type: 'image/jpeg', name: 'large.jpg' }), 'Each photo must be 50 MB or smaller.');
+  assert.equal(photoIO.validImageFile({ size: 0, type: 'image/jpeg', name: 'empty.jpg' }), 'This image file is empty.');
 });
 
 test('readFile validation failures retain the source filename', async function () {
   assert.deepEqual(await photoIO.readFile({ size: 1, type: 'text/plain', name: 'notes.txt' }), {
-    filename: 'notes.txt', error: '请选择图片文件。'
+    filename: 'notes.txt', error: 'Choose an image file.'
   });
   assert.deepEqual(await photoIO.readFile(null), {
-    filename: '未命名照片', error: '请选择有效的图片文件。'
+    filename: 'Untitled photo', error: 'Choose a valid image file.'
   });
 });

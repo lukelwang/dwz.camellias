@@ -1,4 +1,4 @@
-# 花间 · DWZ Camellias
+# DWZ Camellias
 
 A public, phone-first camellia gallery in the original Noir style.
 
@@ -10,7 +10,7 @@ Only the owner `lukelwang` (GitHub ID `5496485`) can enter management mode. The 
 
 ## Create your management token
 
-Open the website's **管理登录** entry and follow **创建 GitHub 令牌**. In GitHub:
+Open the separate owner page shared directly with the owner and choose **Create an access token**. The public gallery has no sign-in entry or management link. The owner page requests `noindex, nofollow, nosnippet`; GitHub owner verification and token permissions remain required. In GitHub:
 
 1. Resource owner: `lukelwang`.
 2. Repository access: **Only select repositories**, then select **dwz.camellias.photo**.
@@ -29,9 +29,15 @@ Public loading resolves the current commit through the GitHub API, then reads im
 
 Modern Safari can decode iPhone HEIC files directly. If the current browser cannot decode a file, the upload reports it and asks for JPEG/compatible format; it does not publish an embedded low-resolution preview as the photo. Physical iPhone Photos picker behavior still needs a real-device check.
 
+## Language
+
+The interface is English. Cultivar search accepts English, Chinese and Japanese names and aliases. Original catalogue names, user captions, notes and Chinese text input remain intact.
+
 ## Development
 
-Buildless HTML/CSS/JavaScript, served directly by GitHub Pages from `main`:
+Buildless HTML/CSS/JavaScript, served directly by GitHub Pages from `main`. The shared source is `templates/gallery.html.template`; regenerate the two documents after editing markup with `python3 scripts/build-pages.py --manager-output <existing-owner-page-filename>`. The owner filename is intentionally not linked here or in the public page.
+
+Run locally and check the application:
 
 ```sh
 python3 -m http.server 8770 --bind 127.0.0.1

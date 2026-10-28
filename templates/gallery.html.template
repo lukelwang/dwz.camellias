@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en" data-style="noir" data-dark="true">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://camellia-nomenclature.github.io; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#101310">
+  <meta name="description" content="A personal camellia garden. Discover the cultivars and photographs behind every bloom.">
+  <title>DWZ Camellias · A personal camellia garden</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="catalogue-picker.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="assets/flower.svg" type="image/svg+xml">
+</head>
+<body data-page="__PAGE__">
+  <svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-flower" viewBox="0 0 32 32"><path d="M16 12C7 0 0 11 12 16 0 21 7 32 16 20 25 32 32 21 20 16 32 11 25 0 16 12Z"/><circle cx="16" cy="16" r="3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.5 5.7a5.4 5.4 0 0 0-7.6 0l-.9.9-.9-.9a5.4 5.4 0 0 0-7.6 7.6L12 22l8.5-8.7a5.4 5.4 0 0 0 0-7.6Z" transform="translate(0 -1.7) scale(1 .96)"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M8 6 9.5 3h5L16 6h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"/><circle cx="12" cy="12.5" r="4"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6m-11 5L20 4M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+  </defs></svg>
+
+
+  <div id="storeStatus" class="store-status" role="status" aria-live="polite"><span id="storeMessage">Opening the garden…</span><button id="reloadGallery" hidden>Reload the garden</button></div>
+
+  <!-- OWNER_START -->
+  <aside class="studio-bar"><span>OWNER STUDIO</span><a href="./" target="_blank" rel="noopener noreferrer">View public gallery ↗</a></aside>
+  <!-- OWNER_END -->
+  <header class="site-header page-width">
+    <a class="brand" href="#" aria-label="DWZ Camellias home"><svg><use href="#i-flower"/></svg><span>DWZ Camellias</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#collection" class="nav-gallery active">The collection</a>
+      <button class="nav-favorites">Favorites <span id="navFavoriteCount">0</span></button>
+      <a href="https://camellia-nomenclature.github.io/" target="_blank" rel="noopener noreferrer" class="nav-source">Cultivar catalogue <svg><use href="#i-external"/></svg></a>
+    </nav>
+    <!-- OWNER_START -->
+    <div class="header-tools"><button id="loginEntry" class="login-entry">Sign in ↗</button><span id="adminBadge" hidden>Owner</span><button id="siteSettings" hidden>Garden settings</button><button id="logoutButton" hidden>Sign out</button><button class="add-photo header-add" data-admin hidden><svg><use href="#i-plus"/></svg><span>Add photos</span></button></div>
+    <!-- OWNER_END -->
+  </header>
+
+  <main>
+    <section class="hero page-width" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> A PERSONAL CAMELLIA COLLECTION</div>
+        <h1 id="heroTitle">Every bloom,<br><span>a moment kept.</span></h1>
+        <p class="hero-description">A garden of more than 400 camellia cultivars.<br>Photographed, remembered, and grown with care.</p>
+        <a class="hero-link" href="#collection">Explore the garden <span><svg><use href="#i-arrow"/></svg></span></a>
+        <div class="hero-stats"><div><strong>400<span>+</span></strong><span>Cultivars in the garden</span></div><div><strong id="heroAlbumCount">0</strong><span>Cultivars photographed</span></div><div><strong>∞</strong><span>Moments worth keeping</span></div></div>
+      </div>
+      <button class="hero-art hero-empty" disabled aria-label="Waiting for the first bloom">
+        <span class="empty-hero-flower"><svg><use href="#i-flower"/></svg></span>
+        <span class="hero-art-shade"></span>
+        <span class="hero-art-top">GROWING WITH PATIENCE <span>One bloom at a time</span></span>
+        <span class="hero-art-bottom"><span><small>Every bloom deserves a place</small><strong>Waiting for the first bloom</strong><em>A garden, slowly growing</em></span><span class="round-arrow"><svg><use href="#i-arrow"/></svg></span></span>
+        <span class="hero-ref"></span>
+      </button>
+      <div class="hero-side-note">A LITTLE GARDEN. A LIFETIME OF WONDER.</div>
+    </section>
+
+    <section id="collection" class="collection page-width" aria-labelledby="collectionTitle">
+      <div class="section-heading"><div><span class="section-index">THE COLLECTION / 001</span><h2 id="collectionTitle">The collection<span id="headingCount">0</span></h2></div><p>One cultivar, one album. Every bloom has a story.</p></div>
+      <div class="search-line"><div class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Find a camellia — try Pearl or Nuccio…" aria-label="Search cultivar names, Chinese aliases, or descriptions" autocomplete="off"><kbd>/</kbd></div><button class="filter-toggle" aria-expanded="false" aria-controls="moreFilters"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></svg>Filters<span id="filterBadge" hidden></span></button></div>
+      <div class="filter-row"><div class="category-tabs" role="group" aria-label="Filter by camellia species"><button data-category="all" class="selected" aria-pressed="true">All cultivars</button><button data-category="Japonica" aria-pressed="false">Japonica</button><button data-category="Sasanqua" aria-pressed="false">Sasanqua</button><button data-category="Reticulata" aria-pressed="false">Reticulata</button><button data-category="NRH" aria-pressed="false">Hybrid</button></div><button id="favoritesFilter" aria-pressed="false"><svg><use href="#i-heart"/></svg>Favorites only</button></div>
+      <div id="moreFilters" class="more-filters" hidden><label>Color<select id="colorFilter"><option value="all">All colors</option><option value="pink">Pink</option><option value="white">White</option><option value="red">Red</option><option value="bicolor">Bicolor</option><option value="yellow">Pale yellow</option></select></label><label>Flower form<select id="formFilter"><option value="all">All forms</option><option value="formal">Formal double</option><option value="single">Single</option><option value="semi">Semi-double</option><option value="peony">Peony</option><option value="anemone">Anemone</option></select></label><button id="resetFilters">Clear filters</button></div>
+      <div class="results-toolbar"><p id="resultSummary" role="status" aria-live="polite">Opening the garden…</p><div><span class="reference-note">Photographs from the garden</span><label class="sort-label"><span class="sr-only">Sort</span><select id="sort"><option value="curated">Random order</option><option value="name">Cultivar A–Z</option><option value="photos">Photo count</option></select></label></div></div>
+      <div id="gallery" class="gallery" aria-label="Camellia cultivar albums"></div>
+      <div id="emptyState" class="empty-state" hidden><svg><use href="#i-flower"/></svg><h3>This bloom has not appeared here yet.</h3><p>Try another name or broaden your filters.</p><button id="emptyReset">View all cultivars <svg><use href="#i-arrow"/></svg></button></div>
+      <p class="gallery-end"><span></span> Blooms return. Memories remain.<span></span></p>
+    </section>
+
+    <section class="garden-note page-width"><div class="note-flower"><svg><use href="#i-flower"/></svg></div><div><span class="section-index">GROWN WITH PATIENCE. KEPT WITH LOVE.</span><h2>More than cultivars. Moments from a life.</h2><p>The same camellia, across seasons, light, and years.<br>Together, these photographs tell the story of this garden.</p></div><!-- OWNER_START --><button class="add-photo note-add" data-admin hidden>Keep a bloom <svg><use href="#i-plus"/></svg></button><!-- OWNER_END --></section>
+  </main>
+  <footer class="site-footer page-width"><a class="brand" href="#"><svg><use href="#i-flower"/></svg><span>DWZ Camellias</span></a><p>A personal garden. A lasting affection.</p><span>Cultivar information from <a href="https://camellia-nomenclature.github.io/" target="_blank" rel="noopener noreferrer">Camellia Nomenclature <svg><use href="#i-external"/></svg></a></span></footer>
+
+  <dialog id="albumDialog" class="album-dialog" aria-label="Cultivar album"><div id="albumContent"></div></dialog>
+  <!-- OWNER_START -->
+  <dialog id="loginDialog" class="login-dialog" aria-labelledby="loginTitle"><div class="dialog-heading"><span class="eyebrow">YOUR PRIVATE GARDEN</span><button data-close="loginDialog" class="icon-button" aria-label="Close sign in"><svg><use href="#i-close"/></svg></button></div><h2 id="loginTitle">Manage your garden</h2><p>Owner access only. Your token stays in this page’s memory. Refreshing signs you out; photographs remain public.</p><details class="token-help"><summary>Create an access token</summary><p>On <a href="https://github.com/settings/personal-access-tokens/new?name=Camellia%20Gallery&amp;target_name=lukelwang&amp;contents=write&amp;expires_in=90" target="_blank" rel="noopener noreferrer">GitHub, create a fine-grained token ↗</a> and set Resource owner to <strong>lukelwang</strong>. Choose Only select repositories and select <strong>dwz.camellias.photo</strong>. Under Repository permissions, set <strong>Contents: Read and write</strong>; keep Metadata at its default read access.</p></details><form id="loginForm"><label for="githubToken">GitHub access token</label><input id="githubToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="GitHub fine-grained token" required><p id="loginError" class="form-error" role="alert"></p><button class="primary-button" type="submit">Verify and sign in →</button></form></dialog>
+  <dialog id="uploadDialog" class="upload-dialog" aria-labelledby="uploadTitle"><div class="dialog-heading"><span class="eyebrow">A NEW BLOOM, A NEW MEMORY</span><button data-close="uploadDialog" class="icon-button" aria-label="Close add photos"><svg><use href="#i-close"/></svg></button></div><h2 id="uploadTitle">Keep a bloom</h2><p class="upload-intro">One cultivar, one batch. Keep this flowering together in one album.</p><div class="upload-steps"><span id="stepCultivar" class="active">01 Choose a cultivar</span><span id="stepPhotos">02 Select photos</span><span id="stepReview">03 Review and save</span></div><form id="uploadForm"><label class="form-label" for="cultivarSearch">Which cultivar did you photograph?</label><div class="cultivar-picker"><div class="cultivar-search-field"><svg><use href="#i-search"/></svg><input id="cultivarSearch" role="combobox" aria-autocomplete="list" aria-controls="cultivarResults" aria-expanded="false" placeholder="Search English or Chinese names and aliases…" autocomplete="off"><button type="button" id="clearCultivar" aria-label="Choose another cultivar" hidden>×</button></div><div id="cultivarResults" class="cultivar-results" role="listbox" aria-label="Cultivar search results" hidden></div></div><p id="catalogueStatus" class="catalogue-status" role="status"></p><div id="selectedCultivarCard" class="selected-cultivar" hidden></div><button type="button" id="useManualCultivar" class="manual-cultivar">Enter this cultivar manually</button><section id="uploadPhotoSection" hidden><label class="mobile-photo-picker" for="photoFiles"><svg><use href="#i-camera"/></svg><strong>Choose photos from your iPhone or computer</strong><span>Select several at once · All go into the cultivar above</span><input id="photoFiles" type="file" accept="image/*,.heic,.heif" multiple></label><p class="photo-import-note">We save gallery JPEGs up to 2560px and thumbnails. Originals stay in your photo library. Capture dates come from EXIF; missing dates stay blank and can be entered manually.</p><p id="importStatus" role="status"></p><div id="pendingPhotos" class="pending-photos"></div><div id="batchFrame" class="batch-frame" hidden><h3>Frames for this batch</h3><div id="uploadFrameControls"></div></div></section><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>Reload latest · Keep my edits</button><button type="button" class="reauth-draft" hidden>Sign in again · Keep my edits</button></div><p id="uploadError" class="form-error" role="alert"></p><div class="upload-submit-bar"><span id="uploadSummary">Choose a cultivar first</span><button type="submit" id="uploadSubmit" class="primary-button" disabled>Save to the garden →</button></div></form></dialog>
+  <dialog id="albumEditDialog" class="edit-dialog" aria-labelledby="albumEditTitle"><div class="dialog-heading"><span class="eyebrow">EDIT CULTIVAR</span><button data-close="albumEditDialog" class="icon-button" aria-label="Close cultivar editor"><svg><use href="#i-close"/></svg></button></div><h2 id="albumEditTitle">Edit cultivar and album</h2><form id="albumEditForm"><input id="editingAlbumId" type="hidden"><div class="form-grid"><label>Display name<input id="editDisplayName" required></label><label>Canonical cultivar name<input id="editCanonicalName" required></label><label>Species<input id="editSpecies" list="speciesOptions"></label><label>Bloom size<input id="editSize"></label><label>Color<select id="editColor"><option value="">See description</option><option value="pink">Pink</option><option value="red">Red</option><option value="white">White</option><option value="bicolor">Bicolor</option><option value="yellow">Pale yellow</option></select></label><label>Flower form<select id="editForm"><option value="">See description</option><option value="formal">Formal double</option><option value="single">Single</option><option value="semi">Semi-double</option><option value="peony">Peony</option><option value="anemone">Anemone</option></select></label></div><label>Description<textarea id="editDescription" rows="4"></textarea></label><label>Garden notes<textarea id="editNotes" rows="3" placeholder="Tell the story of this camellia…"></textarea></label><h3>Default album frame</h3><div id="albumFrameControls"></div><div id="albumFramePreview" class="frame-preview"></div><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>Reload latest · Keep my edits</button><button type="button" class="reauth-draft" hidden>Sign in again · Keep my edits</button></div><p id="albumEditError" class="form-error"></p><button class="primary-button" type="submit">Save album changes →</button></form></dialog>
+  <dialog id="photoEditDialog" class="edit-dialog" aria-labelledby="photoEditTitle"><div class="dialog-heading"><span class="eyebrow">EDIT PHOTOGRAPH</span><button data-close="photoEditDialog" class="icon-button" aria-label="Close photo editor"><svg><use href="#i-close"/></svg></button></div><h2 id="photoEditTitle">Edit this photograph</h2><form id="photoEditForm"><input id="editingPhotoAlbumId" type="hidden"><input id="editingPhotoId" type="hidden"><div id="photoFramePreview" class="frame-preview"></div><label>Caption<input id="editCaption" placeholder="A few words about this moment…"></label><label>Date and time taken<input id="editTakenAt" type="datetime-local"></label><p id="photoDateSource" class="photo-import-note"></p><h3>Frame for this photo</h3><div id="photoFrameControls"></div><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>Reload latest · Keep my edits</button><button type="button" class="reauth-draft" hidden>Sign in again · Keep my edits</button></div><button class="primary-button" type="submit">Save photo changes →</button></form></dialog>
+  <dialog id="settingsDialog" class="edit-dialog" aria-labelledby="settingsTitle"><div class="dialog-heading"><span class="eyebrow">YOUR GARDEN</span><button data-close="settingsDialog" class="icon-button" aria-label="Close garden settings"><svg><use href="#i-close"/></svg></button></div><h2 id="settingsTitle">Garden settings</h2><form id="settingsForm"><label>Garden name<input id="settingBrand" required></label><label>Headline, first line<input id="settingTitle1" required></label><label>Headline, second line<input id="settingTitle2"></label><label>Garden introduction<textarea id="settingDescription" rows="3"></textarea></label><label>Cultivars in the garden<input id="settingCount"></label><div class="dialog-save-status" role="status" aria-live="polite"><p class="save-message"></p><button type="button" class="reload-draft" hidden>Reload latest · Keep my edits</button><button type="button" class="reauth-draft" hidden>Sign in again · Keep my edits</button></div><button class="primary-button" type="submit">Save garden settings →</button></form></dialog>
+  <dialog id="confirmDialog" class="edit-dialog confirm-dialog" aria-labelledby="confirmTitle"><h2 id="confirmTitle">Confirm action</h2><p id="confirmMessage"></p><div class="confirm-actions"><button type="button" id="confirmCancel">Keep and go back</button><button type="button" id="confirmAccept" class="danger-button">Confirm deletion</button></div></dialog>
+  <!-- OWNER_END -->
+  <!-- OWNER_START -->
+  <datalist id="speciesOptions"><option value="Japonica"><option value="Sasanqua"><option value="Reticulata"><option value="NRH"><option value="Wabisuke"><option value="Rusticana"></datalist>
+  <button id="mobileAddPhoto" class="mobile-add-photo" data-admin hidden>+ Add a photo batch</button>
+  <!-- OWNER_END -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<!-- OWNER_START -->
+<script defer src="catalog.js"></script>
+<script defer src="vendor/exifr.js"></script>
+<!-- OWNER_END -->
+<script defer src="src/model.js"></script>
+<script defer src="src/photo-io.js"></script>
+<script defer src="src/github-store.js"></script>
+<script defer src="src/controller.js"></script>
+</body>
+</html>

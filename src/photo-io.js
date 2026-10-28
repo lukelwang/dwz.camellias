@@ -54,11 +54,11 @@
       const image = new Image();
       image.onload = function () {
         const width = image.naturalWidth, height = image.naturalHeight;
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) reject(new Error('无法读取照片尺寸。'));
-        else if (!safeDecodedDimensions(width, height)) reject(new Error('照片分辨率过高（超过 1 亿像素），请缩小后重试。'));
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) reject(new Error('Could not read the photo dimensions.'));
+        else if (!safeDecodedDimensions(width, height)) reject(new Error('The photo exceeds 100 megapixels. Resize it and try again.'));
         else resolve({ image: image, width: width, height: height });
       };
-      image.onerror = function () { reject(new Error('无法解码照片。')); };
+      image.onerror = function () { reject(new Error('Could not decode the photo.')); };
       image.src = src;
     });
   }
@@ -70,7 +70,7 @@
       canvas.height = height;
       const context = canvas.getContext('2d');
       if (!context) {
-        reject(new Error('浏览器无法处理这张照片。'));
+        reject(new Error('Your browser cannot process this photo.'));
         return;
       }
       // JPEG has no alpha channel; fill transparencies with a neutral near-white.
@@ -81,24 +81,24 @@
         canvas.width = 0;
         canvas.height = 0;
         if (blob && blob.size > 0 && blob.type === 'image/jpeg') resolve(blob);
-        else reject(new Error('无法生成照片 JPEG。'));
+        else reject(new Error('Could not create a JPEG photo.'));
       }, 'image/jpeg', quality);
     });
   }
 
   function validImageFile(file) {
-    if (!file || typeof file.size !== 'number' || !Number.isFinite(file.size)) return '请选择有效的图片文件。';
-    if (file.size <= 0) return '这张图片是空文件。';
-    if (file.size > MAX_INPUT_SIZE) return '单张照片不能超过 50 MB。';
+    if (!file || typeof file.size !== 'number' || !Number.isFinite(file.size)) return 'Choose a valid image file.';
+    if (file.size <= 0) return 'This image file is empty.';
+    if (file.size > MAX_INPUT_SIZE) return 'Each photo must be 50 MB or smaller.';
     const type = (file.type || '').toLowerCase();
     const extension = (file.name || '').toLowerCase().split('.').pop();
     if (type.startsWith('image/')) return '';
     if (!type && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif', 'avif', 'tif', 'tiff'].includes(extension)) return '';
-    return '请选择图片文件。';
+    return 'Choose an image file.';
   }
 
   async function readFile(file) {
-    const filename = file && file.name || '未命名照片';
+    const filename = file && file.name || 'Untitled photo';
     const validationError = validImageFile(file);
     if (validationError) return { filename: filename, error: validationError };
     let sourceUrl = '';
@@ -118,10 +118,10 @@
       const decoded = await decode(sourceUrl);
       const imageSize = outputDimensions(decoded.width, decoded.height, IMAGE_EDGE);
       const thumbnailSize = outputDimensions(decoded.width, decoded.height, THUMB_EDGE);
-      if (!imageSize || !thumbnailSize) throw new Error('无法读取照片尺寸。');
+      if (!imageSize || !thumbnailSize) throw new Error('Could not read the photo dimensions.');
       const imageBlob = await encode(decoded.image, imageSize.width, imageSize.height, 0.9);
       const thumbnailBlob = await encode(decoded.image, thumbnailSize.width, thumbnailSize.height, 0.82);
-      if (!imageBlob || !thumbnailBlob) throw new Error('无法生成照片文件。');
+      if (!imageBlob || !thumbnailBlob) throw new Error('Could not create photo files.');
       preparedUrl = URL.createObjectURL(imageBlob);
       URL.revokeObjectURL(sourceUrl);
       sourceUrl = '';
@@ -135,15 +135,15 @@
     } catch (error) {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       if (preparedUrl) URL.revokeObjectURL(preparedUrl);
-      const detail = error && ['无法生成照片 JPEG。', '照片分辨率过高（超过 1 亿像素），请缩小后重试。'].includes(error.message) ? error.message :
-        '此浏览器无法解码或处理这张照片（HEIC/HEIF 可能不受支持，或文件已损坏）。请在 iPhone 上选择兼容格式，或转为 JPEG 后重试。';
+      const detail = error && ['Could not create a JPEG photo.', 'The photo exceeds 100 megapixels. Resize it and try again.'].includes(error.message) ? error.message :
+        'This browser could not decode or process the photo. HEIC/HEIF may not be supported, or the file may be damaged. Choose a compatible format on your iPhone or convert it to JPEG and try again.';
       return { filename: filename, error: detail };
     }
   }
 
   function dateLabel(photo) {
-    if (!photo || !photo.takenAt) return '拍摄时间未知 · 可手动填写';
-    return photo.takenAt.replace('T', ' ') + ' · ' + (photo.dateSource === 'exif' ? '照片 EXIF' : '手动填写');
+    if (!photo || !photo.takenAt) return 'Capture date unknown · Add manually';
+    return photo.takenAt.replace('T', ' ') + ' · ' + (photo.dateSource === 'exif' ? 'Photo EXIF' : 'Entered manually');
   }
 
   return {
