@@ -2,7 +2,6 @@
 (function () {
   'use strict';
 
-  const FRAME = { style: 'none', color: '#d6c29b', width: 5, radius: 12, padding: 8 };
   const SETTINGS = {
     brand: 'DWZ Camellias', titleLine1: 'Every bloom,', titleLine2: 'a moment kept.',
     description: 'A garden of more than 400 camellia cultivars.\nPhotographed, remembered, and grown with care.',
@@ -13,7 +12,8 @@
   const ADMIN_ACTIONS = ['ADD_PHOTOS', 'PATCH_ALBUM', 'PATCH_PHOTO', 'DELETE_PHOTO', 'DELETE_ALBUM', 'SET_COVER', 'MOVE_PHOTO', 'PATCH_SETTINGS'];
   const select = (object, fields) => Object.fromEntries(fields.filter(key => Object.hasOwn(object, key)).map(key => [key, object[key]]));
   const sourceURL = name => 'https://camellia-nomenclature.github.io/#' + encodeURIComponent(name);
-  const frameCopy = frame => frame == null ? null : { ...FRAME, ...select(frame, Object.keys(FRAME)) };
+  const canonicalName = name => typeof name === 'string' ? name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase() : '';
+  const withoutFrame = ({ frame, ...value }) => value;
 
   function shuffle(albums) {
     const result = albums.slice();
@@ -26,15 +26,14 @@
 
   function copyAlbum(album) {
     const photos = (album.photos || []).map((photo, index) => ({
-      ...photo,
+      ...withoutFrame(photo),
       id: photo.id || `${album.id}-photo-${index}`,
       kind: photo.kind || 'personal',
       caption: photo.caption || '', filename: photo.filename || '',
-      takenAt: photo.takenAt || '', dateSource: photo.dateSource || 'unknown',
-      frame: frameCopy(photo.frame)
+      takenAt: photo.takenAt || '', dateSource: photo.dateSource || 'unknown'
     }));
     return {
-      ...album, photos, notes: album.notes || '', frame: frameCopy(album.frame || FRAME),
+      ...withoutFrame(album), photos, notes: album.notes || '',
       coverPhotoId: photos.some(photo => photo.id === album.coverPhotoId) ? album.coverPhotoId : (photos[0]?.id || null)
     };
   }
@@ -79,7 +78,9 @@
       }
       if (type === 'ADD_PHOTOS') {
         const cultivar = typeof action.cultivar === 'string' ? { name: action.cultivar.trim() } : (action.cultivar || {});
-        const existing = state.albums.find(album => (cultivar.id && album.id === cultivar.id) || (cultivar.name && album.name === cultivar.name));
+        const name = canonicalName(cultivar.name);
+        const existing = (cultivar.id && state.albums.find(album => album.id === cultivar.id)) ||
+          (name && state.albums.find(album => canonicalName(album.name) === name));
         if (!existing && !cultivar.name?.trim()) return finish({}, 'Choose or enter a cultivar name first.', true);
         if (!action.photos?.length) return finish({}, 'Choose at least one photo first.', true);
         let album = existing;
@@ -98,8 +99,8 @@
           }
           usedIds.add(id);
           return {
-            ...photo, id, kind: photo.kind || 'personal', caption: photo.caption || '', filename: photo.filename || '',
-            takenAt: photo.takenAt || '', dateSource: photo.dateSource || 'unknown', frame: frameCopy(photo.frame)
+            ...withoutFrame(photo), id, kind: photo.kind || 'personal', caption: photo.caption || '', filename: photo.filename || '',
+            takenAt: photo.takenAt || '', dateSource: photo.dateSource || 'unknown'
           };
         });
         const updated = { ...album, photos: [...album.photos, ...photos], coverPhotoId: album.coverPhotoId || photos[0].id };
@@ -110,13 +111,10 @@
         if (Object.hasOwn(patch, 'name')) {
           patch.name = String(patch.name || '').trim();
           if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
-          if (state.albums.some(album => album.id !== action.id && album.name === patch.name)) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
+          if (state.albums.some(album => album.id !== action.id && canonicalName(album.name) === canonicalName(patch.name))) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
           patch.reference_url = sourceURL(patch.name);
         }
-        return updateAlbum(action.id, album => ({
-          ...album, ...patch,
-          frame: Object.hasOwn(action.patch || {}, 'frame') ? frameCopy({ ...album.frame, ...(action.patch.frame || FRAME) }) : album.frame
-        }), 'Cultivar details updated.');
+        return updateAlbum(action.id, album => ({ ...album, ...patch }), 'Cultivar details updated.');
       }
       if (type === 'DELETE_ALBUM') {
         if (!state.albums.some(album => album.id === action.id)) return finish({}, 'This cultivar album no longer exists.', true);
@@ -132,10 +130,7 @@
             patch.takenAt = '';
             patch.dateSource = 'unknown';
           }
-          if (Object.hasOwn(action.patch || {}, 'frame')) {
-            patch.frame = action.patch.frame == null ? null : frameCopy({ ...(photo.frame || album.frame), ...action.patch.frame });
-          }
-          return updateAlbum(album.id, item => ({ ...item, photos: item.photos.map(current => current.id === photo.id ? { ...current, ...patch } : current) }), 'Photo caption, capture date, or frame updated.');
+          return updateAlbum(album.id, item => ({ ...item, photos: item.photos.map(current => current.id === photo.id ? { ...current, ...patch } : current) }), 'Photo caption or capture date updated.');
         }
         if (type === 'DELETE_PHOTO') {
           return updateAlbum(album.id, item => {

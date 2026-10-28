@@ -12,7 +12,6 @@
   const forms = { formal: 'Formal double', single: 'Single', semi: 'Semi-double', peony: 'Peony', anemone: 'Anemone' };
   const colors = { pink: 'Pink', white: 'White', red: 'Red', bicolor: 'Bicolor', yellow: 'Pale yellow' };
   const sizes = { Medium: 'Medium', Large: 'Large', 'Very large': 'Very large', Miniature: 'Miniature', Small: 'Small', 'Small to medium': 'Small to medium', 'Medium to large': 'Medium to large' };
-  const defaultFrame = { style: 'none', color: '#d6c29b', width: 5, radius: 12, padding: 8 };
   const model = window.CamelliaModel.create();
   const io = window.CamelliaPhotoIO;
   const store = window.CamelliaStore.create();
@@ -37,6 +36,8 @@
   const state = () => model.getState();
   const admin = () => isManagerPage && state().role === 'admin' && store.isAuthenticated();
   const getAlbum = id => state().albums.find(item => item.id === id);
+  const canonicalKey = value => String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+  const existingAlbum = cultivar => (cultivar?.id && getAlbum(cultivar.id)) || state().albums.find(album => canonicalKey(album.name) === canonicalKey(cultivar?.name));
   const cover = album => album.photos.find(photo => photo.id === album.coverPhotoId) || album.photos[0];
   const photosFor = album => album.photos.filter(photo => albumView.filter === 'all' || photo.kind === albumView.filter);
   const dateLabel = photo => io.dateLabel(photo);
@@ -115,6 +116,7 @@
       const document = await store.loadPublic();
       if (generation !== sessionGeneration) return;
       model.accept(document); recoveryRequired = false;
+      if (isManagerPage && selected) setSelected(existingAlbum(selected) || selected);
       const reconciled = reconcilePending(document);
       status('Garden updated.' + reconciled + (dirtyDialogs.size || pending.length ? ' Your edits and pending photos are preserved. Review the latest content before saving.' : ''));
     } catch (error) { status(error.message || 'Could not load the garden. Please try again.', true, true); }
@@ -164,7 +166,6 @@
     pending = pending.filter(photo => {
       const saved = published.get(photo.id);
       if (!saved || ['filename','caption','takenAt','dateSource','dateOffset'].some(field => (saved[field] || '') !== (photo[field] || ''))) return true;
-      if ($('#uploadFrameStyle') && JSON.stringify(saved.frame) !== JSON.stringify(readFrame('uploadFrame'))) return true;
       revoke(photo.src); count++; return false;
     });
     if (count && $('#uploadDialog').open) {
@@ -194,45 +195,8 @@
     $('.filter-toggle').setAttribute('aria-expanded', 'false');
     renderGallery();
   }
-  function frameAttributes(frame) {
-    const f = { ...defaultFrame, ...(frame || {}) };
-    const styles = ['none', 'line', 'double', 'mat', 'shadow', 'polaroid'];
-    const style = styles.includes(f.style) ? f.style : 'none';
-    const color = /^#[\da-f]{6}$/i.test(f.color) ? f.color : defaultFrame.color;
-    const px = value => Math.max(0, Math.min(80, Number(value) || 0));
-    return `data-frame="${style}" style="--frame-color:${color};--frame-width:${px(f.width)}px;--frame-radius:${px(f.radius)}px;--frame-padding:${px(f.padding)}px"`;
-  }
-  function framedPhoto(photo, frame, extraClass = '') {
-    return `<div class="photo-frame ${extraClass}" ${frameAttributes(frame)}><img src="${esc(imageURL(photo?.src))}" alt="${esc(photo?.caption || photo?.filename || 'Camellia photograph')}" loading="lazy" decoding="async"></div>`;
-  }
-  function frameControls(container, prefix, frame, inherit = false) {
-    const f = { ...defaultFrame, ...(frame || {}) };
-    const options = [['none', 'None'], ['line', 'Line'], ['double', 'Double line'], ['mat', 'Mat'], ['shadow', 'Shadow'], ['polaroid', 'Polaroid']];
-    if (inherit) options.unshift(['inherit', 'Use album frame']);
-    const chosen = inherit && frame == null ? 'inherit' : f.style;
-    $('#' + container).innerHTML = `<div class="frame-controls" data-frame-prefix="${prefix}"><label>Style<select id="${prefix}Style">${options.map(([value, label]) => `<option value="${value}" ${value === chosen ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label>Color<input id="${prefix}Color" type="color" value="${esc(f.color)}"></label><label>Width<input id="${prefix}Width" type="range" min="0" max="24" value="${Number(f.width)}"></label><label>Corners<input id="${prefix}Radius" type="range" min="0" max="40" value="${Number(f.radius)}"></label><label>Padding<input id="${prefix}Padding" type="range" min="0" max="40" value="${Number(f.padding)}"></label></div>`;
-  }
-  function readFrame(prefix) {
-    const style = $('#' + prefix + 'Style').value;
-    if (style === 'inherit') return null;
-    return { style, color: $('#' + prefix + 'Color').value, width: Number($('#' + prefix + 'Width').value), radius: Number($('#' + prefix + 'Radius').value), padding: Number($('#' + prefix + 'Padding').value) };
-  }
-  function updateFramePreview(prefix) {
-    if (prefix === 'uploadFrame') {
-      const frame = readFrame(prefix);
-      $$('#pendingPhotos .photo-frame').forEach(element => {
-        const holder = document.createElement('div');
-        holder.innerHTML = `<div ${frameAttributes(frame)}></div>`;
-        element.dataset.frame = holder.firstChild.dataset.frame;
-        element.setAttribute('style', holder.firstChild.getAttribute('style'));
-      });
-      return;
-    }
-    const album = getAlbum(prefix === 'albumFrame' ? $('#editingAlbumId').value : $('#editingPhotoAlbumId').value);
-    if (!album) return;
-    const photo = prefix === 'albumFrame' ? cover(album) : album.photos.find(item => item.id === $('#editingPhotoId').value);
-    const frame = readFrame(prefix) || album.frame;
-    $('#' + (prefix === 'albumFrame' ? 'albumFramePreview' : 'photoFramePreview')).innerHTML = framedPhoto(photo, frame);
+  function photoMarkup(photo) {
+    return `<div class="photo-image"><img src="${esc(imageURL(photo?.src))}" alt="${esc(photo?.caption || photo?.filename || 'Camellia photograph')}" loading="lazy" decoding="async"></div>`;
   }
 
   function renderSettings() {
@@ -293,7 +257,7 @@
       const photo = cover(album);
       const ownCount = album.photos.filter(item => item.kind === 'personal').length;
       const tags = [categories[album.species] || album.species || 'Uncategorized', colors[album.color], forms[album.form] || sizes[album.size] || album.size].filter(Boolean);
-      return `<article class="cultivar-card" data-id="${esc(album.id)}"><button class="card-open" data-open="${esc(album.id)}" aria-label="Open ${esc(album.name)} album"><div class="card-image">${framedPhoto(photo ? { ...photo, src: photo.thumbnailSrc || photo.src } : null, photo?.frame || album.frame)}<span class="card-number">${String(s.albums.indexOf(album) + 1).padStart(2, '0')}</span>${ownCount ? '<span class="personal-tag">Garden photos</span>' : ''}<span class="card-count">${icon('camera')}${album.photos.length} photos</span></div><div class="card-body"><h3 class="card-name">${esc(album.display_name || album.name)}</h3>${chineseAliasText(album) ? `<p class="cultivar-alias card-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(album))}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="card-latin">${esc(album.name)}</p>` : ''}<div class="card-tags">${tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div></div></button><button class="favorite-button" data-favorite="${esc(album.id)}" aria-pressed="${favorite}" aria-label="${favorite ? 'Remove favorite' : 'Favorite'} ${esc(album.name)}">${icon('heart')}</button>${admin() ? `<div class="card-admin" data-admin><button data-edit-album="${esc(album.id)}">Edit cultivar</button><button data-delete-album="${esc(album.id)}">Delete album</button></div>` : ''}</article>`;
+      return `<article class="cultivar-card" data-id="${esc(album.id)}"><button class="card-open" data-open="${esc(album.id)}" aria-label="Open ${esc(album.name)} album"><div class="card-image">${photoMarkup(photo ? { ...photo, src: photo.thumbnailSrc || photo.src } : null)}<span class="card-number">${String(s.albums.indexOf(album) + 1).padStart(2, '0')}</span>${ownCount ? '<span class="personal-tag">Garden photos</span>' : ''}<span class="card-count">${icon('camera')}${album.photos.length} photos</span></div><div class="card-body"><h3 class="card-name">${esc(album.display_name || album.name)}</h3>${chineseAliasText(album) ? `<p class="cultivar-alias card-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(album))}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="card-latin">${esc(album.name)}</p>` : ''}<div class="card-tags">${tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div></div></button><button class="favorite-button" data-favorite="${esc(album.id)}" aria-pressed="${favorite}" aria-label="${favorite ? 'Remove favorite' : 'Favorite'} ${esc(album.name)}">${icon('heart')}</button>${admin() ? `<div class="card-admin" data-admin><button data-edit-album="${esc(album.id)}">Edit cultivar</button><button data-delete-album="${esc(album.id)}">Delete album</button></div>` : ''}</article>`;
     }).join('');
     $('#emptyState').hidden = results.length > 0;
     $('#headingCount').textContent = s.albums.length;
@@ -339,7 +303,7 @@
     const favorite = state().favorites.includes(album.id);
     const chineseAlias = chineseAliasText(album);
     const aliases = [...new Set(album.japanese_name || [])].filter(name => !(album.chinese_name || []).includes(name) && name !== album.name && name !== album.display_name);
-    $('#albumContent').innerHTML = `<div class="album-toolbar"><span>Cultivar album</span><button class="icon-button album-close" data-close="albumDialog" aria-label="Close cultivar album">${icon('close')}</button></div><div class="album-layout"><div class="album-media"><div id="albumStage" class="album-stage">${photo ? `<button class="photo-zoom" data-zoom aria-label="View photograph fullscreen">${framedPhoto(photo, photo.frame || album.frame)}</button>${photos.length > 1 ? `<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button>` : ''}<span class="photo-position">${index + 1} / ${photos.length}</span>` : '<div class="album-empty"><p>No photographs yet.</p><p>Add a photograph to remember this cultivar’s first bloom.</p></div>'}</div><div id="albumThumbnails" class="photo-thumbnails">${photos.map(item => `<button data-photo-id="${esc(item.id)}" class="${item.id === photo?.id ? 'active' : ''}" aria-label="View ${esc(item.caption || item.filename || 'photograph')}" aria-pressed="${item.id === photo?.id}"><img src="${esc(imageURL(item.thumbnailSrc || item.src))}" alt=""></button>`).join('')}</div>${photo ? `<p class="photo-caption">${esc(photo.caption || '')}</p><p id="photoCredit" class="photo-credit">${esc(photo.kind === 'personal' ? 'Garden photograph · ' + photo.filename : 'Reference photograph' + (photo.credit ? ' · © ' + photo.credit : ''))}<br>${esc(dateLabel(photo))}${photo.source_url ? `<br><a href="${esc(sourceURL(photo.source_url))}" target="_blank" rel="noopener noreferrer">View image source</a>` : ''}</p>` : ''}${admin() && photo ? `<div class="photo-admin" data-admin><button data-edit-photo="${esc(photo.id)}">Edit photo and frame</button><button data-cover-photo="${esc(photo.id)}" ${album.coverPhotoId === photo.id ? 'disabled' : ''}>${album.coverPhotoId === photo.id ? 'Current cover' : 'Set as cover'}</button><button data-move-photo="${esc(photo.id)}" data-direction="-1" ${album.photos.indexOf(photo) === 0 ? 'disabled' : ''}>Move earlier</button><button data-move-photo="${esc(photo.id)}" data-direction="1" ${album.photos.indexOf(photo) === album.photos.length - 1 ? 'disabled' : ''}>Move later</button><button data-delete-photo="${esc(photo.id)}">Delete photograph</button></div>` : ''}</div><div class="album-info"><p class="album-category">${esc(categories[album.species] || album.species || 'Uncategorized')}</p><h2>${esc(album.display_name || album.name)}</h2>${chineseAlias ? `<p class="cultivar-alias album-chinese-alias" lang="zh-Hans">${esc(chineseAlias)}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="album-latin">${esc(album.name)}</p>` : ''}${aliases.length ? `<p class="album-aliases">Also known as · ${esc(aliases.join(' / '))}</p>` : ''}<p class="album-description">${esc(album.summary_zh || album.description || 'No cultivar description yet.').replace(/\n/g, '<br>')}</p><dl class="album-facts"><div><dt>Category</dt><dd>${esc(categories[album.species] || album.species || 'Uncategorized')}</dd></div><div><dt>Color</dt><dd>${esc(colors[album.color] || 'See description')}</dd></div><div><dt>Form</dt><dd>${esc(forms[album.form] || 'See description')}</dd></div><div><dt>Bloom size</dt><dd>${esc(sizes[album.size] || album.size || 'Not specified')}</dd></div></dl>${album.notes ? `<div class="album-notes"><h3>Garden notes</h3><p>${esc(album.notes).replace(/\n/g, '<br>')}</p></div>` : ''}<a class="source-link" href="${esc(sourceURL(album.reference_url))}" target="_blank" rel="noopener noreferrer">View full cultivar record ${icon('external')}</a><div class="album-photo-tabs" role="group" aria-label="Photo source">${[['all', 'All photos']].map(([kind, label]) => `<button data-photo-filter="${kind}" aria-pressed="${albumView.filter === kind}">${label} ${album.photos.filter(item => kind === 'all' || item.kind === kind).length}</button>`).join('')}</div><div class="album-actions">${admin() ? `<button class="primary-button" data-add-to="${esc(album.id)}" data-admin>${icon('plus')}Add photos to this cultivar</button><button data-edit-album="${esc(album.id)}" data-admin>Edit cultivar</button><button data-delete-album="${esc(album.id)}" data-admin>Delete album</button>` : ''}<button class="album-heart" data-favorite="${esc(album.id)}" aria-pressed="${favorite}">${icon('heart')}${favorite ? 'Favorited' : 'Favorite cultivar'}</button></div></div></div>`;
+    $('#albumContent').innerHTML = `<div class="album-toolbar"><span>Cultivar album</span><button class="icon-button album-close" data-close="albumDialog" aria-label="Close cultivar album">${icon('close')}</button></div><div class="album-layout"><div class="album-media"><div id="albumStage" class="album-stage">${photo ? `<button class="photo-zoom" data-zoom aria-label="View photograph fullscreen">${photoMarkup(photo)}</button>${photos.length > 1 ? `<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button>` : ''}<span class="photo-position">${index + 1} / ${photos.length}</span>` : '<div class="album-empty"><p>No photographs yet.</p><p>Add a photograph to remember this cultivar’s first bloom.</p></div>'}</div><div id="albumThumbnails" class="photo-thumbnails">${photos.map(item => `<button data-photo-id="${esc(item.id)}" class="${item.id === photo?.id ? 'active' : ''}" aria-label="View ${esc(item.caption || item.filename || 'photograph')}" aria-pressed="${item.id === photo?.id}"><img src="${esc(imageURL(item.thumbnailSrc || item.src))}" alt=""></button>`).join('')}</div>${photo ? `<p class="photo-caption">${esc(photo.caption || '')}</p><p id="photoCredit" class="photo-credit">${esc(photo.kind === 'personal' ? 'Garden photograph · ' + photo.filename : 'Reference photograph' + (photo.credit ? ' · © ' + photo.credit : ''))}<br>${esc(dateLabel(photo))}${photo.source_url ? `<br><a href="${esc(sourceURL(photo.source_url))}" target="_blank" rel="noopener noreferrer">View image source</a>` : ''}</p>` : ''}${admin() && photo ? `<div class="photo-admin" data-admin><button data-edit-photo="${esc(photo.id)}">Edit photo</button><button data-cover-photo="${esc(photo.id)}" ${album.coverPhotoId === photo.id ? 'disabled' : ''}>${album.coverPhotoId === photo.id ? 'Current cover' : 'Set as cover'}</button><button data-move-photo="${esc(photo.id)}" data-direction="-1" ${album.photos.indexOf(photo) === 0 ? 'disabled' : ''}>Move earlier</button><button data-move-photo="${esc(photo.id)}" data-direction="1" ${album.photos.indexOf(photo) === album.photos.length - 1 ? 'disabled' : ''}>Move later</button><button data-delete-photo="${esc(photo.id)}">Delete photograph</button></div>` : ''}</div><div class="album-info"><p class="album-category">${esc(categories[album.species] || album.species || 'Uncategorized')}</p><h2>${esc(album.display_name || album.name)}</h2>${chineseAlias ? `<p class="cultivar-alias album-chinese-alias" lang="zh-Hans">${esc(chineseAlias)}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="album-latin">${esc(album.name)}</p>` : ''}${aliases.length ? `<p class="album-aliases">Also known as · ${esc(aliases.join(' / '))}</p>` : ''}<p class="album-description">${esc(album.summary_zh || album.description || 'No cultivar description yet.').replace(/\n/g, '<br>')}</p><dl class="album-facts"><div><dt>Category</dt><dd>${esc(categories[album.species] || album.species || 'Uncategorized')}</dd></div><div><dt>Color</dt><dd>${esc(colors[album.color] || 'See description')}</dd></div><div><dt>Form</dt><dd>${esc(forms[album.form] || 'See description')}</dd></div><div><dt>Bloom size</dt><dd>${esc(sizes[album.size] || album.size || 'Not specified')}</dd></div></dl>${album.notes ? `<div class="album-notes"><h3>Garden notes</h3><p>${esc(album.notes).replace(/\n/g, '<br>')}</p></div>` : ''}<a class="source-link" href="${esc(sourceURL(album.reference_url))}" target="_blank" rel="noopener noreferrer">View full cultivar record ${icon('external')}</a><div class="album-photo-tabs" role="group" aria-label="Photo source">${[['all', 'All photos']].map(([kind, label]) => `<button data-photo-filter="${kind}" aria-pressed="${albumView.filter === kind}">${label} ${album.photos.filter(item => kind === 'all' || item.kind === kind).length}</button>`).join('')}</div><div class="album-actions">${admin() ? `<button class="primary-button" data-add-to="${esc(album.id)}" data-admin>${icon('plus')}Add photos to this cultivar</button><button data-edit-album="${esc(album.id)}" data-admin>Edit cultivar</button><button data-delete-album="${esc(album.id)}" data-admin>Delete album</button>` : ''}<button class="album-heart" data-favorite="${esc(album.id)}" aria-pressed="${favorite}">${icon('heart')}${favorite ? 'Favorited' : 'Favorite cultivar'}</button></div></div></div>`;
     if ($('#lightbox')?.open) renderLightbox();
   }
   function stepPhoto(direction) {
@@ -355,7 +319,7 @@
     const album = getAlbum(albumView.id);
     const photo = album?.photos.find(item => item.id === albumView.photoId);
     if (!photo) { closeDialog('lightbox'); return; }
-    $('#lightbox').innerHTML = `<button class="icon-button lightbox-close" data-close="lightbox" aria-label="Exit fullscreen">${icon('close')}</button>${framedPhoto(photo, photo.frame || album.frame)}<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button><p class="lightbox-caption">${esc(album.name)} · ${esc(photo.caption || photo.filename)}<br>${esc(dateLabel(photo))}</p>`;
+    $('#lightbox').innerHTML = `<button class="icon-button lightbox-close" data-close="lightbox" aria-label="Exit fullscreen">${icon('close')}</button>${photoMarkup(photo)}<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button><p class="lightbox-caption">${esc(album.name)} · ${esc(photo.caption || photo.filename)}<br>${esc(dateLabel(photo))}</p>`;
   }
   function openLightbox() {
     if (!$('#lightbox')) {
@@ -374,7 +338,6 @@
     $('#uploadError').textContent = '';
     $('#importStatus').textContent = '';
     $('#pendingPhotos').innerHTML = '';
-    frameControls('uploadFrameControls', 'uploadFrame', null, true);
     setSelected(id ? getAlbum(id) : null);
     openDialog('uploadDialog');
     loadCatalogue(uploadGeneration);
@@ -389,38 +352,36 @@
   function updateUpload() {
     if (!isManagerPage) return;
     $('#uploadPhotoSection').hidden = !selected;
-    $('#batchFrame').hidden = pending.length === 0;
     $('#uploadSubmit').disabled = !selected || pending.length === 0 || reading || !admin() || saving || loading;
-    $('#uploadSummary').textContent = selected ? `${selected.display_name || selected.name} · ${pending.length} pending photos${reading ? ' · Reading files' : ''}` : (pending.length ? `${pending.length} pending photos preserved. Choose a cultivar again` : 'Choose a cultivar first');
+    const existing = selected && existingAlbum(selected);
+    $('#uploadSubmit').textContent = existing ? 'Add photos to this album →' : 'Save to the garden →';
+    $('#uploadSummary').textContent = selected ? `${selected.display_name || selected.name} · ${existing ? existing.photos.length + ' saved · ' : ''}${pending.length} new photos${reading ? ' · Reading files' : ''}` : (pending.length ? `${pending.length} pending photos preserved. Choose a cultivar again` : 'Choose a cultivar first');
     $('#stepCultivar').classList.toggle('active', !selected);
     $('#stepPhotos').classList.toggle('active', !!selected && !pending.length);
     $('#stepReview').classList.toggle('active', pending.length > 0);
   }
   function setSelected(cultivar) {
-    selected = cultivar || null;
+    selected = cultivar ? existingAlbum(cultivar) || cultivar : null;
     hideMatches();
     $('#clearCultivar').hidden = !selected && !$('#cultivarSearch').value;
     $('#selectedCultivarCard').hidden = !selected;
     if (selected) {
       $('#cultivarSearch').value = selected.name;
-      $('#selectedCultivarCard').innerHTML = `<div class="selected-cultivar-heading"><strong>${esc(selected.display_name || selected.name)}</strong><span>${esc(categories[selected.species] || selected.species || 'Uncategorized')}</span></div>${chineseAliasText(selected) ? `<p class="cultivar-alias selected-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(selected))}</p>` : ''}${selected.display_name && selected.display_name !== selected.name ? `<p class="selected-cultivar-name">${esc(selected.name)}</p>` : ''}<p class="selected-cultivar-description">${esc(selected.summary_zh || selected.description || 'No description yet.')}</p><p>All photos in this batch will be added to this cultivar’s album.</p><a class="selected-cultivar-link" href="${esc(sourceURL(selected.reference_url))}" target="_blank" rel="noopener noreferrer">View cultivar record ${icon('external')}</a>`;
+      $('#selectedCultivarCard').innerHTML = `<div class="selected-cultivar-heading"><strong>${esc(selected.display_name || selected.name)}</strong><span>${esc(categories[selected.species] || selected.species || 'Uncategorized')}</span></div>${chineseAliasText(selected) ? `<p class="cultivar-alias selected-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(selected))}</p>` : ''}${selected.display_name && selected.display_name !== selected.name ? `<p class="selected-cultivar-name">${esc(selected.name)}</p>` : ''}<p class="selected-cultivar-description">${esc(selected.summary_zh || selected.description || 'No description yet.')}</p>${existingAlbum(selected) ? `<p class="existing-album-note">${existingAlbum(selected).photos.length} photos already saved. New photos will be added to this album.</p>` : '<p>A new album will be created for this cultivar.</p>'}<a class="selected-cultivar-link" href="${esc(sourceURL(selected.reference_url))}" target="_blank" rel="noopener noreferrer">View cultivar record ${icon('external')}</a>`;
     }
-    if (pending.length) updateFramePreview('uploadFrame');
     updateUpload();
   }
   async function loadCatalogue(generation) {
-    $('#catalogueStatus').textContent = 'Connecting to the cultivar catalogue… Existing albums are available offline.';
+    if (!selected) $('#catalogueStatus').textContent = 'Connecting to the cultivar catalogue… Your saved cultivars are ready to add more photos.';
     $('#cultivarSearch').setAttribute('aria-busy', 'true');
     try {
       const index = await window.CamelliaCatalog.loadIndex();
       if (generation !== uploadGeneration || !$('#uploadDialog').open) return;
       catalogueReady = true; catalogueCount = index.length;
-      $('#catalogueStatus').textContent = `${catalogueCount.toLocaleString()} searchable cultivars · Choose a result`;
-      if (!selected) renderMatches();
+      if (!selected) { $('#catalogueStatus').textContent = `${catalogueCount.toLocaleString()} searchable cultivars · Choose a result`; renderMatches(); }
     } catch (_) {
       if (generation !== uploadGeneration || !$('#uploadDialog').open) return;
-      $('#catalogueStatus').textContent = 'Catalogue unavailable. You can still search and choose an existing album.';
-      if (!selected) renderMatches();
+      if (!selected) { $('#catalogueStatus').textContent = 'Catalogue unavailable. Search a saved cultivar to add more photos.'; renderMatches(); }
     } finally {
       if (generation === uploadGeneration) $('#cultivarSearch').setAttribute('aria-busy', 'false');
     }
@@ -430,17 +391,26 @@
     const query = norm($('#cultivarSearch').value);
     const local = state().albums.filter(album => !query || [album.name, album.display_name, ...(album.chinese_name || []), ...(album.japanese_name || [])].some(name => norm(name).includes(query)));
     const live = catalogueReady && query ? window.CamelliaCatalog.search($('#cultivarSearch').value, { limit: 30 }).results : [];
-    catalogueMatches = [...local, ...live.filter(item => !local.some(album => album.name === item.name))].slice(0, 35);
+    const seen = new Set();
+    catalogueMatches = [...local, ...live.map(item => existingAlbum(item) || item)].filter(item => {
+      const key = canonicalKey(item.name);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    }).slice(0, 35);
     catalogueActive = -1;
-    $('#cultivarResults').innerHTML = catalogueMatches.length ? catalogueMatches.map((item, index) => `<button type="button" role="option" id="catalog-option-${index}" class="cultivar-option" data-catalog-name="${esc(item.name)}" aria-selected="false" tabindex="-1"><span class="option-name">${esc(item.name)}</span><span class="option-species">${esc(categories[item.species] || item.species || 'Uncategorized')}</span><span class="option-aliases">${esc([item.display_name, ...(item.chinese_name || []), ...(item.japanese_name || [])].filter(Boolean).join(' / '))}${getAlbum(item.id) ? ' · Existing album' : ''}</span></button>`).join('') : '<div class="cultivar-no-results">No cultivar found. Try an English or Chinese name, or an alias.</div>';
+    $('#cultivarResults').innerHTML = catalogueMatches.length ? catalogueMatches.map((item, index) => {
+      const existing = existingAlbum(item);
+      const aliases = [...new Set([item.display_name, ...(item.chinese_name || []), ...(item.japanese_name || [])])].filter(name => name && name !== item.name).join(' / ');
+      return `<button type="button" role="option" id="catalog-option-${index}" class="cultivar-option${existing ? ' existing-cultivar' : ''}" data-catalog-name="${esc(item.name)}" aria-selected="false" tabindex="-1"><span class="option-name">${esc(item.name)}</span><span class="option-species">${esc(categories[item.species] || item.species || 'Uncategorized')}</span>${aliases ? `<span class="option-aliases">${esc(aliases)}</span>` : ''}${existing ? `<span class="option-existing">In your garden · ${existing.photos.length} photos · Add photos</span>` : ''}</button>`;
+    }).join('') : '<div class="cultivar-no-results">No cultivar found. Try an English or Chinese name, or an alias.</div>';
     $('#cultivarResults').hidden = false;
     $('#cultivarSearch').setAttribute('aria-expanded', 'true');
     $('#cultivarSearch').removeAttribute('aria-activedescendant');
   }
   async function chooseCultivar(name) {
     if (!requireAdmin()) return;
-    const local = state().albums.find(album => album.name === name);
-    if (local) { selectionGeneration++; setSelected(local); return; }
+    const local = existingAlbum({ name });
+    if (local) { selectionGeneration++; setSelected(local); $('#catalogueStatus').textContent = 'Existing album selected. Choose photos to add to it.'; return; }
     const generation = uploadGeneration;
     const selection = ++selectionGeneration;
     hideMatches();
@@ -465,8 +435,7 @@
     active.scrollIntoView({ block: 'nearest' });
   }
   function renderPending() {
-    const frame = readFrame('uploadFrame') || selected?.frame || defaultFrame;
-    $('#pendingPhotos').innerHTML = pending.map(photo => `<article class="pending-photo" data-pending-id="${esc(photo.id)}">${framedPhoto(photo, frame)}<div class="pending-photo-details"><strong>${esc(photo.filename || 'Camellia photograph')}</strong><label>Caption<input data-pending-caption="${esc(photo.id)}" value="${esc(photo.caption)}" placeholder="A few words about this photograph…"></label><label>Date and time taken<input class="pending-date" type="datetime-local" data-pending-date="${esc(photo.id)}" value="${esc(photo.takenAt || '')}"></label><p class="pending-date-source">${esc(dateLabel(photo))}</p><button type="button" data-remove-pending="${esc(photo.id)}">Remove photo</button></div></article>`).join('');
+    $('#pendingPhotos').innerHTML = pending.map(photo => `<article class="pending-photo" data-pending-id="${esc(photo.id)}">${photoMarkup(photo)}<div class="pending-photo-details"><strong>${esc(photo.filename || 'Camellia photograph')}</strong><label>Caption<input data-pending-caption="${esc(photo.id)}" value="${esc(photo.caption)}" placeholder="A few words about this photograph…"></label><label>Date and time taken<input class="pending-date" type="datetime-local" data-pending-date="${esc(photo.id)}" value="${esc(photo.takenAt || '')}"></label><p class="pending-date-source">${esc(dateLabel(photo))}</p><button type="button" data-remove-pending="${esc(photo.id)}">Remove photo</button></div></article>`).join('');
     updateUpload();
   }
   async function readFiles(files) {
@@ -506,7 +475,6 @@
       return;
     }
     const target = { ...selected };
-    const frame = readFrame('uploadFrame');
     const files = [];
     const photos = pending.map(photo => {
       const imagePath = `photos/${photo.id}/image.jpg`;
@@ -514,7 +482,7 @@
       files.push({ path: imagePath, blob: photo.imageBlob }, { path: thumbnailPath, blob: photo.thumbnailBlob });
       const fields = ['id','filename','caption','takenAt','dateSource','dateOffset','width','height','size','mime'];
       const metadata = Object.fromEntries(fields.filter(key => photo[key] !== undefined).map(key => [key, photo[key]]));
-      return { ...metadata, kind: 'personal', frame: frame ? { ...frame } : null, imagePath, thumbnailPath, src: store.photoURL(imagePath), thumbnailSrc: store.photoURL(thumbnailPath) };
+      return { ...metadata, kind: 'personal', imagePath, thumbnailPath, src: store.photoURL(imagePath), thumbnailSrc: store.photoURL(thumbnailPath) };
     });
     const next = await saveAction({ type: 'ADD_PHOTOS', cultivar: target, photos }, { files, message: `Add ${photos.length} photographs` }, '#uploadError');
     if (!next) return;
@@ -537,8 +505,6 @@
     $('#editDescription').value = album.summary_zh || album.description || '';
     $('#editNotes').value = album.notes || '';
     $('#albumEditError').textContent = '';
-    frameControls('albumFrameControls', 'albumFrame', album.frame);
-    updateFramePreview('albumFrame');
     openDialog('albumEditDialog');
   }
   function openPhotoEdit(id) {
@@ -551,8 +517,7 @@
     $('#editCaption').value = photo.caption || '';
     $('#editTakenAt').value = photo.takenAt || '';
     $('#photoDateSource').textContent = dateLabel(photo);
-    frameControls('photoFrameControls', 'photoFrame', photo.frame, true);
-    updateFramePreview('photoFrame');
+    $('#photoPreview').innerHTML = photoMarkup(photo);
     openDialog('photoEditDialog');
   }
   function openSettings() {
@@ -620,7 +585,12 @@
       if (!requireAdmin()) return;
       const name = $('#cultivarSearch').value.trim();
       if (!name) { $('#catalogueStatus').textContent = 'Enter a cultivar name first.'; return; }
-      selectionGeneration++; setSelected({ name, display_name: name }); return;
+      selectionGeneration++;
+      const exact = existingAlbum({ name });
+      const matches = exact ? [exact] : state().albums.filter(album => [album.display_name, ...(album.chinese_name || []), ...(album.japanese_name || [])].some(alias => canonicalKey(alias) === canonicalKey(name)));
+      if (matches.length === 1) { setSelected(matches[0]); $('#catalogueStatus').textContent = 'Existing album selected. Choose photos to add to it.'; return; }
+      if (matches.length > 1) { renderMatches(); $('#catalogueStatus').textContent = 'Several saved cultivars share this name. Choose the album from the results.'; return; }
+      setSelected({ name, display_name: name }); return;
     }
     if (button.id === 'clearCultivar') {
       if (!requireAdmin()) return;
@@ -672,6 +642,7 @@
         token = '';
         if (generation !== sessionGeneration) return;
         model.accept(result.document); model.setAuthenticated(true); recoveryRequired = false;
+        if (selected) setSelected(existingAlbum(selected) || selected);
         const reconciled = reconcilePending(result.document);
         status('Owner verified. Changes will be saved to GitHub.' + reconciled);
         loading = false; lockUI(); closeDialog('loginDialog');
@@ -693,7 +664,7 @@
     $('#albumEditForm').addEventListener('submit', async event => {
       event.preventDefault(); if (!requireAdmin()) return;
       const description = $('#editDescription').value;
-      const patch = { name: $('#editCanonicalName').value, display_name: $('#editDisplayName').value, species: $('#editSpecies').value, size: $('#editSize').value, color: $('#editColor').value, form: $('#editForm').value, description, summary_zh: description, notes: $('#editNotes').value, frame: readFrame('albumFrame') };
+      const patch = { name: $('#editCanonicalName').value, display_name: $('#editDisplayName').value, species: $('#editSpecies').value, size: $('#editSize').value, color: $('#editColor').value, form: $('#editForm').value, description, summary_zh: description, notes: $('#editNotes').value };
       const next = await saveAction({ type: 'PATCH_ALBUM', id: $('#editingAlbumId').value, patch }, {}, '#albumEditError');
       if (next) { dirtyDialogs.delete('albumEditDialog'); closeDialog('albumEditDialog'); }
     });
@@ -705,7 +676,7 @@
       const takenAt = $('#editTakenAt').value;
       const dateSource = !takenAt ? 'unknown' : takenAt === photo?.takenAt ? photo.dateSource : 'manual';
       const dateOffset = dateSource === 'exif' ? photo.dateOffset : '';
-      const next = await saveAction({ type: 'PATCH_PHOTO', albumId, photoId, patch: { caption: $('#editCaption').value, takenAt, dateSource, dateOffset, frame: readFrame('photoFrame') } });
+      const next = await saveAction({ type: 'PATCH_PHOTO', albumId, photoId, patch: { caption: $('#editCaption').value, takenAt, dateSource, dateOffset } });
       if (next) { dirtyDialogs.delete('photoEditDialog'); closeDialog('photoEditDialog'); }
     });
     $('#settingsForm').addEventListener('submit', async event => {
@@ -717,8 +688,6 @@
       const target = event.target;
       const dialog = target.closest('dialog');
       if (dialog && !['loginDialog','confirmDialog'].includes(dialog.id)) dirtyDialogs.add(dialog.id);
-      const frame = target.closest('[data-frame-prefix]');
-      if (frame) updateFramePreview(frame.dataset.framePrefix);
       if (target.dataset.pendingCaption) {
         const photo = pending.find(item => item.id === target.dataset.pendingCaption);
         if (photo) photo.caption = target.value;

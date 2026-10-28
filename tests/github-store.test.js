@@ -16,7 +16,7 @@ const photo = id => ({
   id, kind: 'personal', imagePath: `photos/${id}/image.jpg`, thumbnailPath: `photos/${id}/thumbnail.jpg`,
   src: RAW + `photos/${id}/image.jpg`, thumbnailSrc: RAW + `photos/${id}/thumbnail.jpg`,
   filename: '茶花.jpg', caption: '春天的花 🌸', takenAt: '2026-03-20T10:23', dateSource: 'exif', dateOffset: '+08:00',
-  width: 1600, height: 1200, size: 100, mime: 'image/jpeg', frame: null
+  width: 1600, height: 1200, size: 100, mime: 'image/jpeg'
 });
 const withPhotos = (...ids) => ({ ...empty(), albums: [{ id: 'album-1', name: '花鹤翎', photos: ids.map(photo), coverPhotoId: ids[0] || null, reference_url: 'https://example.com/reference' }] });
 const filesFor = id => ['image', 'thumbnail'].map(name => ({ path: `photos/${id}/${name}.jpg`, blob: new Blob([`jpeg ${name}`], { type: 'image/jpeg' }) }));
@@ -310,16 +310,38 @@ test('deleting photos deletes both files and JSON in the same tree and commit', 
   assert.equal(github.commits.length, 1);
 });
 
-test('metadata, cover, order and frame edits persist without touching image blobs', async () => {
+test('metadata, cover and order edits persist without touching image blobs', async () => {
   const github = new GitHub(withPhotos('one', 'two'));
   const store = github.store();
   await store.login(TOKEN);
   const next = withPhotos('two', 'one');
   next.albums[0].photos[0].caption = '新的说明';
-  next.albums[0].photos[0].frame = { style: 'double', color: '#aabbcc', width: 5, padding: 10, radius: 2 };
+  next.albums[0].notes = '保留花园笔记 🌸';
   await store.save(next);
   assert.deepEqual(github.trees[0].tree.map(item => item.path), ['gallery.json']);
   assert.deepEqual(JSON.parse(Buffer.from(github.blobs.at(-1).content, 'base64')), next);
+});
+
+test('legacy frames remain readable and an ordinary frame-free document saves with the same schema', async () => {
+  const legacy = withPhotos('one', 'two');
+  legacy.albums[0].frame = { style: 'mat', color: '#ffeecc' };
+  legacy.albums[0].photos[0].frame = { style: 'double', padding: 8 };
+  legacy.albums[0].photos[1].frame = null;
+  legacy.albums[0].notes = '原有笔记';
+  const github = new GitHub(legacy);
+  const store = github.store();
+  assert.deepEqual(await store.loadPublic(), legacy);
+  const login = await store.login(TOKEN);
+  assert.deepEqual(login.document, legacy);
+  const next = clone(login.document);
+  delete next.albums[0].frame;
+  for (const photo of next.albums[0].photos) delete photo.frame;
+  next.albums[0].notes = '更新笔记 🌸';
+  const result = await store.save(next);
+  assert.deepEqual(result.document, next);
+  assert.equal(result.document.schemaVersion, 1);
+  assert.deepEqual(github.trees[0].tree.map(item => item.path), ['gallery.json']);
+  assert.deepEqual(github.document, next);
 });
 
 test('unsafe paths, transient images, missing pairs, arbitrary removals and newer schema fail closed', async () => {

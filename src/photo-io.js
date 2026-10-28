@@ -130,7 +130,7 @@
         width: imageSize.width, height: imageSize.height, size: imageBlob.size, sourceSize: file.size,
         mime: 'image/jpeg', filename: filename, caption: '',
         takenAt: takenAt, dateSource: takenAt ? 'exif' : 'unknown', dateOffset: dateOffset,
-        frame: null, kind: 'personal'
+        kind: 'personal'
       };
     } catch (error) {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);

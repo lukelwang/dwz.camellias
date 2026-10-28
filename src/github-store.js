@@ -87,7 +87,6 @@
           for (const field of ['filename', 'caption', 'takenAt', 'dateSource', 'dateOffset', 'mime']) check(typeof photo[field] === 'string');
           check(photo.mime === 'image/jpeg');
           for (const field of ['width', 'height', 'size']) check(Number.isSafeInteger(photo[field]) && photo[field] > 0);
-          check(photo.frame === null || (photo.frame && typeof photo.frame === 'object' && !Array.isArray(photo.frame)));
         }
         check(album.coverPhotoId == null || album.photos.some(photo => photo.id === album.coverPhotoId));
       }

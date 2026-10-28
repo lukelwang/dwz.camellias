@@ -63,7 +63,7 @@ textarea { resize: vertical; }
 .login-dialog small { display: block; margin-top: 20px; font-size: 12px; line-height: 1.7; color: #9ba68e; }
 .login-dialog form, .edit-dialog form { display: grid; gap: 18px; margin-top: 22px; }
 .login-dialog form { gap: 10px; }
-.edit-dialog form > label, .form-grid > label, .frame-controls label,
+.edit-dialog form > label, .form-grid > label,
 .pending-photo-fields label, #loginForm > label {
   display: grid;
   gap: 8px;
@@ -73,7 +73,7 @@ textarea { resize: vertical; }
   line-height: 1.6;
 }
 .edit-dialog input, .edit-dialog select, .edit-dialog textarea, #githubToken,
-.pending-photo-fields input, .frame-controls select, .frame-controls input:not([type="range"]):not([type="color"]) {
+.pending-photo-fields input {
   min-width: 0;
   width: 100%;
   min-height: 48px;
@@ -88,7 +88,7 @@ textarea { resize: vertical; }
 .edit-dialog textarea { min-height: 104px; }
 .edit-dialog input[type="hidden"] { display: none; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 14px; }
-.edit-dialog h3, .batch-frame h3 { font-size: 15px; font-weight: 500; line-height: 1.6; margin: 3px 0 0; }
+.edit-dialog h3 { font-size: 15px; font-weight: 500; line-height: 1.6; margin: 3px 0 0; }
 .primary-button { min-height: 48px; font-size: 14px; line-height: 1.5; border-radius: 4px; }
 .danger-button, .card-admin .danger-button, .album-management .danger-button {
   border: 1px solid #794a41;
@@ -108,6 +108,9 @@ textarea { resize: vertical; }
 #clearCultivar { min-width: 44px; min-height: 44px; font-size: 24px; }
 .catalogue-status { margin: 10px 0; color: #a8b39a; font-size: 13px; line-height: 1.6; }
 .cultivar-option { min-height: 64px; }
+.cultivar-option.existing-cultivar { border-color: #65764d; background: #20291c; }
+.option-existing { display: inline-block; margin-left: 7px; padding: 2px 7px; border: 1px solid #65764d; border-radius: 12px; color: #d0ddaF; font-size: 13px; line-height: 1.4; }
+.existing-album-note { color: #aebc9f; font-size: 13px; line-height: 1.6; }
 .option-aliases, .option-species, .selected-cultivar-aliases, .selected-cultivar-description { font-size: 13px; }
 .cultivar-results { position: static; margin-top: 6px; max-height: min(300px, 38dvh); }
 .mobile-photo-picker {
@@ -145,33 +148,12 @@ textarea { resize: vertical; }
 .pending-date { width: 100%; min-width: 0; }
 .pending-date-source { font-size: 12px; }
 .pending-photo-remove { grid-column: 1 / -1; justify-self: end; min-height: 44px; padding: 9px 12px; border: 1px solid #674c3e; border-radius: 4px; color: #e7b8a5; font-size: 13px; }
-.batch-frame { margin-top: 24px; padding: 18px 0; border-top: 1px solid #3c4733; }
-.batch-frame h3 { margin-bottom: 14px; }
 .upload-submit-bar { position: sticky; bottom: -28px; z-index: 6; display: grid; gap: 11px; margin: 22px -28px -28px; padding: 15px 28px 20px; border-top: 1px solid #46503b; background: #191d18; box-shadow: 0 -10px 22px #10131080; }
 #uploadSummary { color: #c6d3b1; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 #uploadDialog .upload-submit-bar .primary-button { width: 100%; margin: 0; }
 
-.frame-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; min-width: 0; }
-.frame-controls input[type="color"] { min-height: 46px; width: 100%; padding: 5px; border: 1px solid #46503b; border-radius: 4px; background: #101510; cursor: pointer; }
-.frame-controls input[type="range"] { width: 100%; min-width: 0; min-height: 44px; margin: 0; accent-color: #c4d5a8; }
-.frame-controls output { color: #b6c4a1; font-size: 12px; }
-.frame-preview { display: grid; place-items: center; min-height: 160px; padding: 18px; border: 1px solid #35412e; border-radius: 4px; background: #101310; }
-.frame-preview .photo-frame { max-width: 100%; width: 230px; }
-.frame-preview img { display: block; width: 100%; max-height: 230px; object-fit: contain; }
-.photo-frame[data-frame] { --frame-color: #ede8db; --frame-width: 3px; --frame-radius: 2px; --frame-padding: 10px; border-radius: var(--frame-radius); }
-.photo-frame[data-frame] > img { border-radius: max(0px, calc(var(--frame-radius) - var(--frame-width))); }
-html[data-dark="true"] .card-image.photo-frame img { filter: none; }
-.photo-frame[data-frame="none"] { border: 0; padding: 0; box-shadow: none; }
-.photo-frame[data-frame="line"] { border: var(--frame-width) solid var(--frame-color); }
-.photo-frame[data-frame="double"] { border: max(3px, var(--frame-width)) double var(--frame-color); padding: 3px; }
-.photo-frame[data-frame="mat"] { padding: var(--frame-padding); background: var(--frame-color); }
-.photo-frame[data-frame="shadow"] { border: max(1px, var(--frame-width)) solid var(--frame-color); box-shadow: 0 7px 16px #0008; }
-.photo-frame[data-frame="polaroid"] { padding: var(--frame-padding); padding-bottom: calc(var(--frame-padding) + 24px); background: var(--frame-color); box-shadow: 0 4px 12px #0006; }
-.album-stage > button.photo-zoom.photo-frame { border-radius: var(--frame-radius); }
-.album-stage > button.photo-zoom.photo-frame[data-frame="double"] { padding: 3px; }
-.album-stage > button.photo-zoom.photo-frame[data-frame="mat"] { padding: var(--frame-padding); }
-.album-stage > button.photo-zoom.photo-frame[data-frame="polaroid"] { padding: var(--frame-padding); padding-bottom: calc(var(--frame-padding) + 24px); }
-.card-image.photo-frame::after { background: linear-gradient(transparent 56%, #0a130ac2); pointer-events: none; }
+.photo-edit-preview { display: grid; place-items: center; min-height: 160px; }
+.photo-edit-preview img { display: block; max-width: 100%; max-height: 230px; object-fit: contain; }
 .card-count { text-shadow: 0 1px 3px #000; }
 .card-admin { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
 .card-admin button { flex: 1 1 60px; padding: 9px 7px; font-size: 12px; }
@@ -213,7 +195,6 @@ html[data-dark="true"] .card-image.photo-frame img { filter: none; }
   .pending-photo-thumb, .pending-photo-thumb img, .pending-photo > img { width: 64px; height: 80px; }
   .pending-photo-fields input[type="datetime-local"] { font-size: 16px; padding-inline: 5px; }
   .upload-submit-bar { bottom: calc(-22px - env(safe-area-inset-bottom)); margin: 20px -18px calc(-22px - env(safe-area-inset-bottom)); padding: 13px 18px calc(16px + env(safe-area-inset-bottom)); }
-  .frame-preview { padding: 14px; }
   .album-management button { flex-basis: 120px; font-size: 13px; }
   .album-dialog .photo-credit { font-size: 11px; }
   .album-photo-tabs button { min-height: 44px; font-size: 12px; }
@@ -233,18 +214,17 @@ html[data-dark="true"] .card-image.photo-frame img { filter: none; }
   .pending-photo > img { width: 100%; height: 132px; object-fit: contain; }
   .pending-photo-fields input[type="datetime-local"] { padding-inline: 10px; }
   .header-tools > button:not(.header-add) { font-size: 11px; padding-inline: 6px; }
-  .frame-controls { gap: 12px 9px; }
   .upload-steps > span { font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
-/* Nested frame and pending-photo layout. */
-.card-image > .photo-frame,.photo-zoom > .photo-frame{width:100%;height:100%;overflow:hidden}
-.photo-frame > img{display:block;width:100%;height:100%;object-fit:cover}
-.photo-zoom > .photo-frame > img{object-fit:contain}
-.pending-photo > .photo-frame{width:88px;height:102px;overflow:hidden}
+/* Plain image wrappers preserve gallery, stage, fullscreen and pending-photo dimensions. */
+.card-image > .photo-image,.photo-zoom > .photo-image{width:100%;height:100%;overflow:hidden}
+.photo-image > img{display:block;width:100%;height:100%;object-fit:cover}
+.photo-zoom > .photo-image > img{object-fit:contain}
+.pending-photo > .photo-image{width:88px;height:102px;overflow:hidden}
 .pending-photo-details{display:grid;min-width:0;gap:12px}
 .pending-photo-details > strong{font-size:13px;overflow-wrap:anywhere;line-height:1.5}
 .pending-photo-details label{display:grid;gap:6px;min-width:0;font-size:12px;color:#c5ceba}
@@ -258,18 +238,18 @@ html[data-dark="true"] .card-image.photo-frame img { filter: none; }
 .album-empty{display:grid;align-content:center;text-align:center;gap:12px;height:100%;padding:30px;color:var(--muted);font-size:13px}
 .album-notes{font-size:12px;line-height:1.8;padding-block:12px;color:var(--muted)}
 .album-notes h3{font-size:12px;color:var(--text);font-weight:400;margin-bottom:5px}
-.lightbox>.photo-frame{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:55px 35px 75px}
-.lightbox>.photo-frame>img{height:100%;max-width:100%;object-fit:contain}
+.lightbox>.photo-image{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:55px 35px 75px}
+.lightbox>.photo-image>img{height:100%;max-width:100%;object-fit:contain}
 @media(max-width:580px){.pending-photo{grid-template-columns:72px minmax(0,1fr);gap:10px;padding:11px}
-.pending-photo>.photo-frame{width:72px;height:92px}
+.pending-photo>.photo-image{width:72px;height:92px}
 .pending-photo-details{gap:10px}
 .pending-photo-details input[type=datetime-local]{font-size:16px;padding-inline:3px}
 .photo-admin button{font-size:11px}
 .album-actions>.primary-button{flex-basis:100%}
 .album-heart{min-width:100px}}
 @media(max-width:359px){.pending-photo{grid-template-columns:1fr}
-.pending-photo>.photo-frame{width:100%;height:140px}
-.pending-photo>.photo-frame>img{object-fit:contain}
+.pending-photo>.photo-image{width:100%;height:140px}
+.pending-photo>.photo-image>img{object-fit:contain}
 .pending-photo-details input[type=datetime-local]{padding-inline:9px}}
 
 .album-toolbar{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:60px;padding:8px 12px 8px 22px;border-bottom:1px solid var(--line);background:var(--surface)}
@@ -297,8 +277,8 @@ html[data-dark="true"] .hero-empty { opacity:1; cursor:default; background:radia
 .hero-empty .empty-hero-flower svg { width:100%; height:100%; stroke-width:.45; }
 .hero-empty .round-arrow { display:none; }
 .hero-empty .hero-art-bottom small { margin-bottom:8px; }
-.card-image .photo-frame:has(img[src$="flower.svg"]) { display:grid; place-items:center; background:#20291c; }
-.card-image .photo-frame img[src$="flower.svg"] { width:56px; height:56px; object-fit:contain; opacity:.45; }
+.card-image .photo-image:has(img[src$="flower.svg"]) { display:grid; place-items:center; background:#20291c; }
+.card-image .photo-image img[src$="flower.svg"] { width:56px; height:56px; object-fit:contain; opacity:.45; }
 input,select,textarea { font-size:16px; }
 button, .site-header nav>a, .site-header nav>button { min-height:44px; }
 @media(max-width:580px) { .hero-empty .empty-hero-flower { right:-12%; top:25%; width:330px; height:330px; } .store-status { font-size:11px; padding:7px 18px; } .confirm-dialog { width:calc(100% - 32px)!important; border-radius:10px; padding:24px; } .login-dialog { height:fit-content; } }

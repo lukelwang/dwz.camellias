@@ -3,6 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const photoIO = require('../src/photo-io.js');
+const fs = require('node:fs');
+const vm = require('node:vm');
 
 test('cameraDate keeps camera wall time and rejects invalid or incomplete timestamps', function () {
   assert.equal(photoIO.cameraDate('2024:02:29 23:59:58'), '2024-02-29T23:59');
@@ -50,4 +52,42 @@ test('readFile validation failures retain the source filename', async function (
   assert.deepEqual(await photoIO.readFile(null), {
     filename: 'Untitled photo', error: 'Choose a valid image file.'
   });
+});
+
+test('processed photos retain Unicode names and EXIF metadata and omit custom frames', async function () {
+  const revoked = [];
+  let urlNumber = 0;
+  const scope = {
+    module: { exports: {} },
+    crypto: { randomUUID: () => 'photo-new' },
+    exifr: { parse: async () => ({ DateTimeOriginal: '2026:03:20 10:23:45', OffsetTimeOriginal: '+08:00' }) },
+    URL: { createObjectURL: () => 'blob:photo-' + (++urlNumber), revokeObjectURL: url => revoked.push(url) },
+    Image: class {
+      naturalWidth = 4000;
+      naturalHeight = 3000;
+      set src(value) { this.onload(); }
+    },
+    document: {
+      createElement: () => ({
+        getContext: () => ({ fillRect() {}, drawImage() {} }),
+        toBlob: callback => callback({ size: 100, type: 'image/jpeg' })
+      })
+    }
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../src/photo-io.js'), 'utf8'), scope);
+  const photo = await scope.module.exports.readFile({ size: 5000, type: 'image/jpeg', name: '我的茶花 🌸.jpg' });
+  assert.equal(photo.error, undefined);
+  assert.equal(photo.id, 'photo-new');
+  assert.equal(photo.filename, '我的茶花 🌸.jpg');
+  assert.equal(photo.takenAt, '2026-03-20T10:23');
+  assert.equal(photo.dateSource, 'exif');
+  assert.equal(photo.dateOffset, '+08:00');
+  assert.equal(photo.width, 2560);
+  assert.equal(photo.height, 1920);
+  assert.equal(photo.kind, 'personal');
+  assert.equal(photo.mime, 'image/jpeg');
+  assert.equal(photo.imageBlob.size, 100);
+  assert.equal(photo.thumbnailBlob.size, 100);
+  assert.equal(Object.hasOwn(photo, 'frame'), false);
+  assert.deepEqual(revoked, ['blob:photo-1']);
 });
