@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css?v=9bb5f7423db9">
   <link rel="stylesheet" href="themes.css?v=cae4aca01be2">
   <link rel="stylesheet" href="catalogue-picker.css?v=1a1a496b64e3">
-  <link rel="stylesheet" href="app.css?v=9e3f49de912c">
+  <link rel="stylesheet" href="app.css?v=c98bdc51a016">
   <link rel="icon" href="assets/flower.svg" type="image/svg+xml">
 </head>
 <body data-page="gallery">
@@ -63,12 +63,12 @@
 
     <section id="collection" class="collection page-width" aria-labelledby="collectionTitle">
       <div class="section-heading"><div><span class="section-index">THE COLLECTION / 001</span><h2 id="collectionTitle">The collection<span id="headingCount">0</span></h2></div><p>One cultivar, one album. Every bloom has a story.</p></div>
-      <div class="search-line"><div class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Find a camellia — try Pearl or Nuccio…" aria-label="Search cultivar names, Chinese aliases, or descriptions" autocomplete="off"><kbd>/</kbd></div><button class="filter-toggle" aria-expanded="false" aria-controls="moreFilters"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></svg>Filters<span id="filterBadge" hidden></span></button></div>
+      <div class="search-line"><div class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search camellias…" aria-label="Search cultivar names, Chinese aliases, or descriptions" autocomplete="off"><kbd>/</kbd></div><button class="filter-toggle" aria-expanded="false" aria-controls="moreFilters"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></svg>Filters<span id="filterBadge" hidden></span></button></div>
       <div class="filter-row"><div class="category-tabs" role="group" aria-label="Filter by camellia species"><button data-category="all" class="selected" aria-pressed="true">All cultivars</button><button data-category="Japonica" aria-pressed="false">Japonica</button><button data-category="Sasanqua" aria-pressed="false">Sasanqua</button><button data-category="Reticulata" aria-pressed="false">Reticulata</button><button data-category="NRH" aria-pressed="false">Hybrid</button></div><button id="favoritesFilter" aria-pressed="false"><svg><use href="#i-heart"/></svg>Favorites only</button></div>
       <div id="moreFilters" class="more-filters" hidden><label>Color<select id="colorFilter"><option value="all">All colors</option><option value="pink">Pink</option><option value="white">White</option><option value="red">Red</option><option value="bicolor">Bicolor</option><option value="yellow">Pale yellow</option></select></label><label>Flower form<select id="formFilter"><option value="all">All forms</option><option value="formal">Formal double</option><option value="single">Single</option><option value="semi">Semi-double</option><option value="peony">Peony</option><option value="anemone">Anemone</option></select></label><button id="resetFilters">Clear filters</button></div>
-      <div class="results-toolbar"><p id="resultSummary" role="status" aria-live="polite">Opening the garden…</p><div><span class="reference-note">Photographs from the garden</span><label class="sort-label"><span class="sr-only">Sort</span><select id="sort"><option value="curated">Random order</option><option value="name">Cultivar A–Z</option><option value="photos">Photo count</option></select></label></div></div>
+      <div class="results-toolbar"><p id="resultSummary" role="status" aria-live="polite">Opening the garden…</p><div><span class="reference-note">Photographs from the garden</span><label class="sort-label"><span>Sort by</span><select id="sort"><option value="curated">Random order</option><option value="name">Cultivar A–Z</option><option value="photos">Photo count</option></select></label></div></div>
       <div id="gallery" class="gallery" aria-label="Camellia cultivar albums"></div>
-      <div id="emptyState" class="empty-state" hidden><svg><use href="#i-flower"/></svg><h3>This bloom has not appeared here yet.</h3><p>Try another name or broaden your filters.</p><button id="emptyReset">View all cultivars <svg><use href="#i-arrow"/></svg></button></div>
+      <div id="emptyState" class="empty-state" hidden><svg><use href="#i-flower"/></svg><h3>This bloom has not appeared here yet.</h3><p>Try another name or broaden your filters.</p><button id="emptyReset">View all cultivars <svg><use href="#i-arrow"/></svg></button><button id="emptyReload" hidden>Try loading again <svg><use href="#i-arrow"/></svg></button></div>
       <p class="gallery-end"><span></span> Blooms return. Memories remain.<span></span></p>
     </section>
 
@@ -82,8 +82,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script defer src="src/model.js?v=1481290cf9f8"></script>
-<script defer src="src/photo-io.js?v=c1d91d21e13c"></script>
+<script defer src="src/photo-io.js?v=bc570f2a593d"></script>
 <script defer src="src/github-store.js?v=e813b35a6207"></script>
-<script defer src="src/controller.js?v=24385ab8263b"></script>
+<script defer src="src/controller.js?v=9b91851a57f1"></script>
 </body>
 </html>

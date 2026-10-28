@@ -30,9 +30,18 @@
   let toastTimer;
   let saving = false;
   let loading = false;
+  let galleryLoaded = false;
+  let galleryLoadError = false;
   let sessionGeneration = 0;
   let recoveryRequired = false;
   const dirtyDialogs = new Set();
+  const dialogOpeners = new Map();
+  const editorBaselines = new Map();
+  const editorFields = {
+    albumEditDialog: { editDisplayName: 'display_name', editCanonicalName: 'name', editSpecies: 'species', editSize: 'size', editColor: 'color', editForm: 'form', editDescription: 'description', editNotes: 'notes' },
+    photoEditDialog: { editCaption: 'caption', editTakenAt: 'takenAt' },
+    settingsDialog: { settingBrand: 'brand', settingTitle1: 'titleLine1', settingTitle2: 'titleLine2', settingDescription: 'description', settingCount: 'gardenCount' }
+  };
   const state = () => model.getState();
   const admin = () => isManagerPage && state().role === 'admin' && store.isAuthenticated();
   const getAlbum = id => state().albums.find(item => item.id === id);
@@ -41,12 +50,76 @@
   const cover = album => album.photos.find(photo => photo.id === album.coverPhotoId) || album.photos[0];
   const photosFor = album => album.photos.filter(photo => albumView.filter === 'all' || photo.kind === albumView.filter);
   const dateLabel = photo => io.dateLabel(photo);
+  const countLabel = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
   const sourceURL = value => /^https?:\/\//i.test(value || '') ? value : 'https://camellia-nomenclature.github.io/';
   const imageURL = value => {
     const photo = /^https:\/\/raw\.githubusercontent\.com\/lukelwang\/dwz\.camellias\.photo\/main\/(photos\/[A-Za-z0-9_-]+\/(?:image|thumbnail)\.jpg)$/.exec(value || '');
     if (photo && typeof store.displayURL === 'function') return store.displayURL(photo[1]);
     return /^(data:image\/|blob:|https?:\/\/)/i.test(value || '') ? value : document.querySelector('link[rel="icon"]').href;
   };
+
+  function focusRoot(element = document.activeElement) {
+    return element?.closest('dialog,#gallery') || document.body;
+  }
+  function topDialog() {
+    return [...dialogOpeners.keys()].map(id => $('#' + id)).filter(dialog => dialog?.open).at(-1);
+  }
+  function rememberFocus(root) {
+    const element = document.activeElement;
+    if (!element || !root.contains(element) || element === document.body) return null;
+    const controls = [...root.querySelectorAll('button,a,input,select,textarea')];
+    return { element, id: element.id, attributes: [...element.attributes].filter(attribute => attribute.name.startsWith('data-') && !['data-admin','data-lock-disabled'].includes(attribute.name)).map(attribute => [attribute.name, attribute.value]), index: controls.indexOf(element) };
+  }
+  function restoreFocus(focus, root, fallback) {
+    if (!focus || saving || loading) return;
+    const top = topDialog();
+    if (top && top !== root && !top.contains(root)) return;
+    const controls = [...root.querySelectorAll('button,a,input,select,textarea')].filter(element => !element.disabled && !element.closest('[hidden]'));
+    let target = focus.element.isConnected && root.contains(focus.element) && !focus.element.disabled ? focus.element : null;
+    if (!target && focus.id) target = controls.find(element => element.id === focus.id);
+    if (!target && focus.attributes.length) target = controls.find(element => focus.attributes.every(([name, value]) => element.getAttribute(name) === value));
+    target ||= controls[Math.min(Math.max(focus.index, 0), controls.length - 1)] || fallback;
+    if (target && !target.disabled && !target.closest('[hidden]') && (!top || top.contains(target)) && target !== document.activeElement) target.focus({ preventScroll: true });
+  }
+
+  function refreshEditor(id, preserveDraft = false) {
+    const fields = editorFields[id];
+    let record;
+    if (id === 'albumEditDialog') {
+      const album = getAlbum($('#editingAlbumId').value);
+      if (album) record = { ...album, display_name: album.display_name || album.name, description: album.summary_zh || album.description || '' };
+    } else if (id === 'photoEditDialog') record = getAlbum($('#editingPhotoAlbumId').value)?.photos.find(photo => photo.id === $('#editingPhotoId').value);
+    else record = state().settings;
+    if (!record) return;
+    const previous = editorBaselines.get(id);
+    const baseline = {};
+    Object.entries(fields).forEach(([inputId, field]) => {
+      const input = $('#' + inputId);
+      const latest = String(record[field] ?? '');
+      const changed = preserveDraft && previous && input.value !== previous[inputId];
+      if (!changed) input.value = latest;
+      baseline[inputId] = changed ? latest : input.value;
+    });
+    editorBaselines.set(id, baseline);
+    updateEditorDirty(id);
+    if (id === 'photoEditDialog') {
+      $('#photoPreview').innerHTML = photoMarkup(record);
+      $('#photoDateSource').textContent = $('#editTakenAt').value === record.takenAt ? dateLabel(record) : ($('#editTakenAt').value ? 'Entered manually · ' + $('#editTakenAt').value.replace('T', ' ') : 'Capture date unknown');
+    }
+  }
+  function updateEditorDirty(id) {
+    const baseline = editorBaselines.get(id);
+    if (!baseline) return;
+    if (Object.keys(editorFields[id]).some(inputId => $('#' + inputId).value !== baseline[inputId])) dirtyDialogs.add(id);
+    else dirtyDialogs.delete(id);
+  }
+  function refreshOpenEditors() {
+    Object.keys(editorFields).forEach(id => { if ($('#' + id)?.open) refreshEditor(id, true); });
+  }
+  function editorPatch(id) {
+    const baseline = editorBaselines.get(id);
+    return Object.fromEntries(Object.entries(editorFields[id]).filter(([inputId]) => $('#' + inputId).value !== baseline?.[inputId]).map(([inputId, field]) => [field, $('#' + inputId).value]));
+  }
 
   function toast(message) {
     clearTimeout(toastTimer);
@@ -87,6 +160,8 @@
     const proposal = model.propose(action);
     if (proposal.error) { if (errorTarget) $(errorTarget).textContent = proposal.notice; toast(proposal.notice); return null; }
     const generation = sessionGeneration;
+    const root = focusRoot();
+    const focus = rememberFocus(root);
     saving = true; lockUI();
     status('Saving to GitHub. Keep this page open…');
     if (errorTarget) $(errorTarget).textContent = '';
@@ -94,6 +169,7 @@
       const result = await store.save(proposal.document, { ...options, onProgress: message => status(message) });
       if (generation !== sessionGeneration) return null;
       model.accept(result.document);
+      refreshOpenEditors();
       status('Saved to the garden.');
       toast(proposal.notice);
       return state();
@@ -107,21 +183,24 @@
       status(message + ' Your draft is preserved.' + (recoveryRequired ? ' Reload the latest garden, review your draft, then save.' : ''), true, true);
       toast(message);
       return null;
-    } finally { saving = false; lockUI(); render(); updateUpload(); }
+    } finally { saving = false; lockUI(); render(); updateUpload(); restoreFocus(focus, root, $('#emptyReset')); }
   }
   async function loadGallery() {
     if (saving || loading) return;
     const generation = sessionGeneration;
-    loading = true; lockUI(); status('Loading the latest garden…');
+    const root = focusRoot();
+    const focus = rememberFocus(root);
+    loading = true; galleryLoadError = false; status('Loading the latest garden…'); renderGallery(); lockUI();
     try {
       const document = await store.loadPublic();
       if (generation !== sessionGeneration) return;
-      model.accept(document); recoveryRequired = false;
+      model.accept(document); recoveryRequired = false; galleryLoaded = true; galleryLoadError = false;
+      refreshOpenEditors();
       if (isManagerPage && selected) setSelected(existingAlbum(selected) || selected);
       const reconciled = reconcilePending(document);
-      status((reconciled + (dirtyDialogs.size || pending.length ? ' Your edits and pending photos are preserved. Review the latest content before saving.' : '')).trim());
-    } catch (error) { status(error.message || 'Could not load the garden. Please try again.', true, true); }
-    finally { loading = false; lockUI(); render(); updateUpload(); }
+      status((reconciled + (dirtyDialogs.size || pending.length ? ' Your edits and pending photos are preserved. Untouched fields now show the latest content. Review your draft before saving.' : '')).trim());
+    } catch (error) { galleryLoadError = true; status(error.message || 'Could not load the garden. Please try again.', true, true); }
+    finally { loading = false; lockUI(); render(); updateUpload(); restoreFocus(focus, root, $('#emptyReset')); }
   }
   function requireAdmin() {
     if (!isManagerPage) return false;
@@ -133,14 +212,18 @@
     if (saving || loading) return;
     if (id === 'loginDialog' && !isManagerPage) return;
     const dialog = $('#' + id);
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog && !dialog.open) {
+      const root = focusRoot();
+      dialogOpeners.set(id, { root, focus: rememberFocus(root) });
+      dialog.showModal();
+    }
   }
   function closeDialog(id) { if (!saving && !loading) $('#' + id)?.close(); }
   function confirmAction(message, label = 'Confirm deletion') {
     if (saving || loading || $('#confirmDialog').open) return Promise.resolve(false);
     $('#confirmMessage').textContent = message;
     $('#confirmAccept').textContent = label;
-    $('#confirmDialog').showModal();
+    openDialog('confirmDialog');
     return new Promise(resolve => {
       const finish = accepted => { $('#confirmDialog').close(); cleanup(); resolve(accepted); };
       const yes = () => finish(true);
@@ -243,6 +326,8 @@
     hero.querySelector('.hero-ref').textContent = 'Garden photography';
   }
   function renderGallery() {
+    const root = $('#gallery');
+    const focus = rememberFocus(root);
     const s = state();
     const query = norm($('#search').value);
     const color = $('#colorFilter').value;
@@ -258,16 +343,29 @@
       const photo = cover(album);
       const ownCount = album.photos.filter(item => item.kind === 'personal').length;
       const tags = [categories[album.species] || album.species || 'Uncategorized', colors[album.color], forms[album.form] || sizes[album.size] || album.size].filter(Boolean);
-      return `<article class="cultivar-card" data-id="${esc(album.id)}"><button class="card-open" data-open="${esc(album.id)}" aria-label="Open ${esc(album.name)} album"><div class="card-image">${photoMarkup(photo ? { ...photo, src: photo.thumbnailSrc || photo.src } : null)}<span class="card-number">${String(s.albums.indexOf(album) + 1).padStart(2, '0')}</span>${ownCount ? '<span class="personal-tag">Garden photos</span>' : ''}<span class="card-count">${icon('camera')}${album.photos.length} photos</span></div><div class="card-body"><h3 class="card-name">${esc(album.display_name || album.name)}</h3>${chineseAliasText(album) ? `<p class="cultivar-alias card-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(album))}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="card-latin">${esc(album.name)}</p>` : ''}<div class="card-tags">${tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div></div></button><button class="favorite-button" data-favorite="${esc(album.id)}" aria-pressed="${favorite}" aria-label="${favorite ? 'Remove favorite' : 'Favorite'} ${esc(album.name)}">${icon('heart')}</button>${admin() ? `<div class="card-admin" data-admin><button data-edit-album="${esc(album.id)}">Edit cultivar</button><button data-delete-album="${esc(album.id)}">Delete album</button></div>` : ''}</article>`;
+      return `<article class="cultivar-card" data-id="${esc(album.id)}"><button class="card-open" data-open="${esc(album.id)}" aria-label="Open ${esc(album.name)} album"><div class="card-image">${photoMarkup(photo ? { ...photo, src: photo.thumbnailSrc || photo.src } : null)}<span class="card-number">${String(s.albums.indexOf(album) + 1).padStart(2, '0')}</span>${ownCount ? '<span class="personal-tag">Garden photos</span>' : ''}<span class="card-count">${icon('camera')}${countLabel(album.photos.length, 'photo')}</span></div><div class="card-body"><h3 class="card-name">${esc(album.display_name || album.name)}</h3>${chineseAliasText(album) ? `<p class="cultivar-alias card-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(album))}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="card-latin">${esc(album.name)}</p>` : ''}<div class="card-tags">${tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div></div></button><button class="favorite-button" data-favorite="${esc(album.id)}" aria-pressed="${favorite}" aria-label="${favorite ? 'Remove favorite' : 'Favorite'} ${esc(album.name)}">${icon('heart')}</button>${admin() ? `<div class="card-admin" data-admin><button data-edit-album="${esc(album.id)}">Edit cultivar</button><button data-delete-album="${esc(album.id)}">Delete album</button></div>` : ''}</article>`;
     }).join('');
     $('#emptyState').hidden = results.length > 0;
     $('#headingCount').textContent = s.albums.length;
     $('#navFavoriteCount').textContent = s.favorites.length;
     const own = results.reduce((sum, album) => sum + album.photos.filter(photo => photo.kind === 'personal').length, 0);
-    $('#resultSummary').textContent = `${results.length} cultivars · ${own} photos`;
-    $('#emptyState h3').textContent = s.albums.length ? 'This bloom is still waiting to be found.' : 'A garden begins with a bloom.';
-    $('#emptyState p').textContent = s.albums.length ? 'Try another name or broaden your filters.' : 'Real blooms from the garden will grow into a camellia collection here.';
-    $('#emptyReset').hidden = !s.albums.length;
+    $('#resultSummary').textContent = !galleryLoaded ? (galleryLoadError ? 'The garden could not be loaded.' : 'Loading the garden…') : `${countLabel(results.length, 'cultivar')} · ${countLabel(own, 'photo')}`;
+    let title = 'No cultivars match this view.';
+    let message = 'Try another name or clear your filters to see the whole collection.';
+    if (!galleryLoaded) {
+      title = galleryLoadError ? 'The garden is temporarily unavailable.' : 'Opening the garden…';
+      message = galleryLoadError ? 'Check your connection, then try loading the collection again.' : 'The latest cultivars and photographs will appear here shortly.';
+    } else if (!s.albums.length) {
+      title = 'A garden begins with a bloom.';
+      message = 'Real blooms from the garden will grow into a camellia collection here.';
+    } else if (gallery.favorites && !s.favorites.length) {
+      title = 'Your favorite cultivars will bloom here.';
+      message = 'Choose the heart on a cultivar to keep it here during this visit.';
+    }
+    $('#emptyState h3').textContent = title;
+    $('#emptyState p').textContent = message;
+    $('#emptyReset').hidden = !galleryLoaded || !s.albums.length;
+    $('#emptyReload').hidden = galleryLoaded || !galleryLoadError;
     $('#filterBadge').hidden = color === 'all' && form === 'all';
     $('#filterBadge').textContent = String((color !== 'all' ? 1 : 0) + (form !== 'all' ? 1 : 0));
     $('#favoritesFilter').setAttribute('aria-pressed', gallery.favorites);
@@ -278,6 +376,7 @@
       button.classList.toggle('selected', active);
       button.setAttribute('aria-pressed', active);
     });
+    restoreFocus(focus, root, $('#emptyReset').hidden ? $('#search') : $('#emptyReset'));
   }
   function render() {
     renderSettings(); renderGallery(); renderHero();
@@ -295,6 +394,8 @@
     openDialog('albumDialog');
   }
   function renderAlbum() {
+    const root = $('#albumContent');
+    const focus = rememberFocus(root);
     const album = getAlbum(albumView.id);
     if (!album) { closeDialog('albumDialog'); return; }
     const photos = photosFor(album);
@@ -306,6 +407,7 @@
     const aliases = [...new Set(album.japanese_name || [])].filter(name => !(album.chinese_name || []).includes(name) && name !== album.name && name !== album.display_name);
     $('#albumContent').innerHTML = `<div class="album-toolbar"><span>Cultivar album</span><button class="icon-button album-close" data-close="albumDialog" aria-label="Close cultivar album">${icon('close')}</button></div><div class="album-layout"><div class="album-media"><div id="albumStage" class="album-stage">${photo ? `<button class="photo-zoom" data-zoom aria-label="View photograph fullscreen">${photoMarkup(photo)}</button>${photos.length > 1 ? `<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button>` : ''}<span class="photo-position">${index + 1} / ${photos.length}</span>` : '<div class="album-empty"><p>No photographs yet.</p><p>Add a photograph to remember this cultivar’s first bloom.</p></div>'}</div><div id="albumThumbnails" class="photo-thumbnails">${photos.map(item => `<button data-photo-id="${esc(item.id)}" class="${item.id === photo?.id ? 'active' : ''}" aria-label="View ${esc(item.caption || item.filename || 'photograph')}" aria-pressed="${item.id === photo?.id}"><img src="${esc(imageURL(item.thumbnailSrc || item.src))}" alt=""></button>`).join('')}</div>${photo ? `<p class="photo-caption">${esc(photo.caption || '')}</p><p id="photoCredit" class="photo-credit">${esc(photo.kind === 'personal' ? 'Garden photograph · ' + photo.filename : 'Reference photograph' + (photo.credit ? ' · © ' + photo.credit : ''))}<br>${esc(dateLabel(photo))}${photo.source_url ? `<br><a href="${esc(sourceURL(photo.source_url))}" target="_blank" rel="noopener noreferrer">View image source</a>` : ''}</p>` : ''}${admin() && photo ? `<div class="photo-admin" data-admin><button data-edit-photo="${esc(photo.id)}">Edit photo</button><button data-cover-photo="${esc(photo.id)}" ${album.coverPhotoId === photo.id ? 'disabled' : ''}>${album.coverPhotoId === photo.id ? 'Current cover' : 'Set as cover'}</button><button data-move-photo="${esc(photo.id)}" data-direction="-1" ${album.photos.indexOf(photo) === 0 ? 'disabled' : ''}>Move earlier</button><button data-move-photo="${esc(photo.id)}" data-direction="1" ${album.photos.indexOf(photo) === album.photos.length - 1 ? 'disabled' : ''}>Move later</button><button data-delete-photo="${esc(photo.id)}">Delete photograph</button></div>` : ''}</div><div class="album-info"><p class="album-category">${esc(categories[album.species] || album.species || 'Uncategorized')}</p><h2>${esc(album.display_name || album.name)}</h2>${chineseAlias ? `<p class="cultivar-alias album-chinese-alias" lang="zh-Hans">${esc(chineseAlias)}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="album-latin">${esc(album.name)}</p>` : ''}${aliases.length ? `<p class="album-aliases">Also known as · ${esc(aliases.join(' / '))}</p>` : ''}<p class="album-description">${esc(album.summary_zh || album.description || 'No cultivar description yet.').replace(/\n/g, '<br>')}</p><dl class="album-facts"><div><dt>Category</dt><dd>${esc(categories[album.species] || album.species || 'Uncategorized')}</dd></div><div><dt>Color</dt><dd>${esc(colors[album.color] || 'See description')}</dd></div><div><dt>Form</dt><dd>${esc(forms[album.form] || 'See description')}</dd></div><div><dt>Bloom size</dt><dd>${esc(sizes[album.size] || album.size || 'Not specified')}</dd></div></dl>${album.notes ? `<div class="album-notes"><h3>Garden notes</h3><p>${esc(album.notes).replace(/\n/g, '<br>')}</p></div>` : ''}<a class="source-link" href="${esc(sourceURL(album.reference_url))}" target="_blank" rel="noopener noreferrer">View full cultivar record ${icon('external')}</a><div class="album-photo-tabs" role="group" aria-label="Photo source">${[['all', 'All photos']].map(([kind, label]) => `<button data-photo-filter="${kind}" aria-pressed="${albumView.filter === kind}">${label} ${album.photos.filter(item => kind === 'all' || item.kind === kind).length}</button>`).join('')}</div><div class="album-actions">${admin() ? `<button class="primary-button" data-add-to="${esc(album.id)}" data-admin>${icon('plus')}Add photos to this cultivar</button><button data-edit-album="${esc(album.id)}" data-admin>Edit cultivar</button><button data-delete-album="${esc(album.id)}" data-admin>Delete album</button>` : ''}<button class="album-heart" data-favorite="${esc(album.id)}" aria-pressed="${favorite}">${icon('heart')}${favorite ? 'Favorited' : 'Favorite cultivar'}</button></div></div></div>`;
     if ($('#lightbox')?.open) renderLightbox();
+    restoreFocus(focus, root, $('#albumDialog .album-close'));
   }
   function stepPhoto(direction) {
     const album = getAlbum(albumView.id);
@@ -317,10 +419,13 @@
     renderAlbum();
   }
   function renderLightbox() {
+    const root = $('#lightbox');
+    const focus = rememberFocus(root);
     const album = getAlbum(albumView.id);
     const photo = album?.photos.find(item => item.id === albumView.photoId);
     if (!photo) { closeDialog('lightbox'); return; }
     $('#lightbox').innerHTML = `<button class="icon-button lightbox-close" data-close="lightbox" aria-label="Exit fullscreen">${icon('close')}</button>${photoMarkup(photo)}<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button><p class="lightbox-caption">${esc(album.name)} · ${esc(photo.caption || photo.filename)}<br>${esc(dateLabel(photo))}</p>`;
+    restoreFocus(focus, root, $('#lightbox .lightbox-close'));
   }
   function openLightbox() {
     if (!$('#lightbox')) {
@@ -435,9 +540,18 @@
     $('#cultivarSearch').setAttribute('aria-activedescendant', active.id);
     active.scrollIntoView({ block: 'nearest' });
   }
+  function pendingMarkup(photo) {
+    return `<article class="pending-photo" data-pending-id="${esc(photo.id)}">${photoMarkup(photo)}<div class="pending-photo-details"><strong>${esc(photo.filename || 'Camellia photograph')}</strong><label>Caption<input data-pending-caption="${esc(photo.id)}" value="${esc(photo.caption)}" placeholder="A few words about this photograph…"></label><label>Date and time taken<input class="pending-date" type="datetime-local" data-pending-date="${esc(photo.id)}" value="${esc(photo.takenAt || '')}"></label><p class="pending-date-source">${esc(dateLabel(photo))}</p><button type="button" data-remove-pending="${esc(photo.id)}">Remove photo</button></div></article>`;
+  }
   function renderPending() {
-    $('#pendingPhotos').innerHTML = pending.map(photo => `<article class="pending-photo" data-pending-id="${esc(photo.id)}">${photoMarkup(photo)}<div class="pending-photo-details"><strong>${esc(photo.filename || 'Camellia photograph')}</strong><label>Caption<input data-pending-caption="${esc(photo.id)}" value="${esc(photo.caption)}" placeholder="A few words about this photograph…"></label><label>Date and time taken<input class="pending-date" type="datetime-local" data-pending-date="${esc(photo.id)}" value="${esc(photo.takenAt || '')}"></label><p class="pending-date-source">${esc(dateLabel(photo))}</p><button type="button" data-remove-pending="${esc(photo.id)}">Remove photo</button></div></article>`).join('');
+    const root = $('#pendingPhotos');
+    const focus = rememberFocus(root);
+    const ids = new Set(pending.map(photo => photo.id));
+    [...root.children].forEach(row => { if (!ids.has(row.dataset.pendingId)) row.remove(); });
+    const rendered = new Set([...root.children].map(row => row.dataset.pendingId));
+    pending.forEach(photo => { if (!rendered.has(photo.id)) root.insertAdjacentHTML('beforeend', pendingMarkup(photo)); });
     updateUpload();
+    restoreFocus(focus, root, $('#photoFiles'));
   }
   async function readFiles(files) {
     if (!requireAdmin() || !selected || reading) return;
@@ -463,7 +577,7 @@
     reading = false;
     $('#photoFiles').disabled = false;
     $('#photoFiles').value = '';
-    $('#importStatus').textContent = `${pending.length} photos ready. You can add more to this batch.`;
+    $('#importStatus').textContent = `${countLabel(pending.length, 'photo')} ready. You can add more to this batch.`;
     $('#uploadError').textContent = failed.length ? `Could not preview: ${failed.join(', ')}. Convert these files to JPEG or PNG and try again. Other photos are preserved.` : '';
     renderPending();
   }
@@ -498,14 +612,7 @@
     if (!album) return;
     $('#editingAlbumId').value = id;
     $('#editAlbumAddPhotos').dataset.addTo = id;
-    $('#editDisplayName').value = album.display_name || album.name;
-    $('#editCanonicalName').value = album.name;
-    $('#editSpecies').value = album.species || '';
-    $('#editSize').value = album.size || '';
-    $('#editColor').value = album.color || '';
-    $('#editForm').value = album.form || '';
-    $('#editDescription').value = album.summary_zh || album.description || '';
-    $('#editNotes').value = album.notes || '';
+    refreshEditor('albumEditDialog');
     $('#albumEditError').textContent = '';
     openDialog('albumEditDialog');
   }
@@ -516,20 +623,12 @@
     if (!photo) return;
     $('#editingPhotoAlbumId').value = album.id;
     $('#editingPhotoId').value = photo.id;
-    $('#editCaption').value = photo.caption || '';
-    $('#editTakenAt').value = photo.takenAt || '';
-    $('#photoDateSource').textContent = dateLabel(photo);
-    $('#photoPreview').innerHTML = photoMarkup(photo);
+    refreshEditor('photoEditDialog');
     openDialog('photoEditDialog');
   }
   function openSettings() {
     if (!requireAdmin()) return;
-    const settings = state().settings;
-    $('#settingBrand').value = settings.brand;
-    $('#settingTitle1').value = settings.titleLine1;
-    $('#settingTitle2').value = settings.titleLine2;
-    $('#settingDescription').value = settings.description;
-    $('#settingCount').value = settings.gardenCount;
+    refreshEditor('settingsDialog');
     openDialog('settingsDialog');
   }
   async function deleteAlbum(id) {
@@ -579,7 +678,7 @@
       pending = pending.filter(item => item !== photo); if (photo) revoke(photo.src); renderPending(); return;
     }
     if (button.dataset.category) { gallery.category = button.dataset.category; renderGallery(); return; }
-    if (button.id === 'reloadGallery' || button.matches('.reload-draft')) { loadGallery(); return; }
+    if (button.id === 'reloadGallery' || button.id === 'emptyReload' || button.matches('.reload-draft')) { loadGallery(); return; }
     if (isManagerPage && (button.id === 'loginEntry' || button.matches('.reauth-draft'))) { $('#githubToken').value = ''; $('#loginError').textContent = ''; openDialog('loginDialog'); return; }
     if (button.id === 'logoutButton') { logout(); return; }
     if (button.id === 'siteSettings') { openSettings(); return; }
@@ -643,7 +742,8 @@
         const result = await store.login(token);
         token = '';
         if (generation !== sessionGeneration) return;
-        model.accept(result.document); model.setAuthenticated(true); recoveryRequired = false;
+        model.accept(result.document); model.setAuthenticated(true); recoveryRequired = false; galleryLoaded = true; galleryLoadError = false;
+        refreshOpenEditors();
         if (selected) setSelected(existingAlbum(selected) || selected);
         const reconciled = reconcilePending(result.document);
         status('Owner verified. Changes will be saved to GitHub.' + reconciled);
@@ -665,8 +765,9 @@
   if (isManagerPage) {
     $('#albumEditForm').addEventListener('submit', async event => {
       event.preventDefault(); if (!requireAdmin()) return;
-      const description = $('#editDescription').value;
-      const patch = { name: $('#editCanonicalName').value, display_name: $('#editDisplayName').value, species: $('#editSpecies').value, size: $('#editSize').value, color: $('#editColor').value, form: $('#editForm').value, description, summary_zh: description, notes: $('#editNotes').value };
+      const patch = editorPatch('albumEditDialog');
+      if (!Object.keys(patch).length) { closeDialog('albumEditDialog'); toast('No album changes to save.'); return; }
+      if (Object.hasOwn(patch, 'description')) patch.summary_zh = patch.description;
       const next = await saveAction({ type: 'PATCH_ALBUM', id: $('#editingAlbumId').value, patch }, {}, '#albumEditError');
       if (next) { dirtyDialogs.delete('albumEditDialog'); closeDialog('albumEditDialog'); }
     });
@@ -674,22 +775,24 @@
       event.preventDefault(); if (!requireAdmin()) return;
       const albumId = $('#editingPhotoAlbumId').value;
       const photoId = $('#editingPhotoId').value;
-      const photo = getAlbum(albumId)?.photos.find(item => item.id === photoId);
-      const takenAt = $('#editTakenAt').value;
-      const dateSource = !takenAt ? 'unknown' : takenAt === photo?.takenAt ? photo.dateSource : 'manual';
-      const dateOffset = dateSource === 'exif' ? photo.dateOffset : '';
-      const next = await saveAction({ type: 'PATCH_PHOTO', albumId, photoId, patch: { caption: $('#editCaption').value, takenAt, dateSource, dateOffset } });
+      const patch = editorPatch('photoEditDialog');
+      if (!Object.keys(patch).length) { closeDialog('photoEditDialog'); toast('No photo changes to save.'); return; }
+      if (Object.hasOwn(patch, 'takenAt')) { patch.dateSource = patch.takenAt ? 'manual' : 'unknown'; patch.dateOffset = ''; }
+      const next = await saveAction({ type: 'PATCH_PHOTO', albumId, photoId, patch });
       if (next) { dirtyDialogs.delete('photoEditDialog'); closeDialog('photoEditDialog'); }
     });
     $('#settingsForm').addEventListener('submit', async event => {
       event.preventDefault(); if (!requireAdmin()) return;
-      const next = await saveAction({ type: 'PATCH_SETTINGS', patch: { brand: $('#settingBrand').value, titleLine1: $('#settingTitle1').value, titleLine2: $('#settingTitle2').value, description: $('#settingDescription').value, gardenCount: $('#settingCount').value } });
+      const patch = editorPatch('settingsDialog');
+      if (!Object.keys(patch).length) { closeDialog('settingsDialog'); toast('No garden settings to save.'); return; }
+      const next = await saveAction({ type: 'PATCH_SETTINGS', patch });
       if (next) { dirtyDialogs.delete('settingsDialog'); closeDialog('settingsDialog'); }
     });
     document.addEventListener('input', event => {
       const target = event.target;
       const dialog = target.closest('dialog');
-      if (dialog && !['loginDialog','confirmDialog'].includes(dialog.id)) dirtyDialogs.add(dialog.id);
+      if (dialog && editorFields[dialog.id]) updateEditorDirty(dialog.id);
+      else if (dialog && !['loginDialog','confirmDialog'].includes(dialog.id)) dirtyDialogs.add(dialog.id);
       if (target.dataset.pendingCaption) {
         const photo = pending.find(item => item.id === target.dataset.pendingCaption);
         if (photo) photo.caption = target.value;
@@ -716,16 +819,20 @@
     });
     dialog.addEventListener('close', () => {
       dirtyDialogs.delete(dialog.id);
+      editorBaselines.delete(dialog.id);
+      const opener = dialogOpeners.get(dialog.id);
+      dialogOpeners.delete(dialog.id);
       if (dialog.id === 'uploadDialog') { clearPending(); $('#photoFiles').disabled = false; }
       if (dialog.id === 'loginDialog') $('#githubToken').value = '';
       if (dialog.id === 'albumDialog') closeDialog('lightbox');
+      if (opener) restoreFocus(opener.focus, opener.root, $('#emptyReset').hidden ? $('#search') : $('#emptyReset'));
     });
   }
   $$('dialog').forEach(wireDialog);
   document.addEventListener('keydown', event => {
     if (saving || loading || event.target.matches('input,textarea,select') || event.isComposing) return;
     if (event.key === '/' && !$('dialog[open]')) { event.preventDefault(); $('#search').focus(); $('#collection').scrollIntoView({ behavior: 'smooth' }); }
-    const top = $$('dialog[open]').at(-1);
+    const top = topDialog();
     if (top && ['albumDialog', 'lightbox'].includes(top.id)) {
       if (event.key === 'ArrowRight') { event.preventDefault(); stepPhoto(1); }
       if (event.key === 'ArrowLeft') { event.preventDefault(); stepPhoto(-1); }

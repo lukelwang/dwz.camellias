@@ -142,7 +142,7 @@
   }
 
   function dateLabel(photo) {
-    if (!photo || !photo.takenAt) return 'Capture date unknown · Add manually';
+    if (!photo || !photo.takenAt) return 'Capture date unknown';
     return photo.takenAt.replace('T', ' ') + ' · ' + (photo.dateSource === 'exif' ? 'Photo EXIF' : 'Entered manually');
   }
 

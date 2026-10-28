@@ -23,6 +23,12 @@ test('cameraOffset is kept separate and accepts only valid EXIF offsets', functi
   assert.equal(photoIO.cameraOffset('Z'), '');
 });
 
+test('capture-date labels describe public metadata without unavailable editing instructions', function () {
+  assert.equal(photoIO.dateLabel({ takenAt: '' }), 'Capture date unknown');
+  assert.equal(photoIO.dateLabel({ takenAt: '2026-03-20T10:23', dateSource: 'exif' }), '2026-03-20 10:23 · Photo EXIF');
+  assert.equal(photoIO.dateLabel({ takenAt: '2026-03-20T10:23', dateSource: 'manual' }), '2026-03-20 10:23 · Entered manually');
+});
+
 test('outputDimensions preserves aspect ratio and caps the longest edge', function () {
   assert.deepEqual(photoIO.outputDimensions(6000, 4000, 2560), { width: 2560, height: 1707 });
   assert.deepEqual(photoIO.outputDimensions(600, 400, 640), { width: 600, height: 400 });
