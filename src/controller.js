@@ -486,6 +486,7 @@
     $('#pendingPhotos').innerHTML = '';
     setSelected(id ? getAlbum(id) : null);
     openDialog('uploadDialog');
+    revealPhotoPicker();
     loadCatalogue(uploadGeneration);
     if (!selected) $('#cultivarSearch').focus();
   }
@@ -506,16 +507,25 @@
     $('#stepPhotos').classList.toggle('active', !!selected && !pending.length);
     $('#stepReview').classList.toggle('active', pending.length > 0);
   }
+  function revealPhotoPicker() {
+    if (!selected || !$('#uploadDialog').open || !window.matchMedia('(max-width: 580px)').matches) return;
+    $('#cultivarSearch').blur();
+    requestAnimationFrame(() => {
+      if (selected && $('#uploadDialog').open) $('.mobile-photo-picker').scrollIntoView({ block: 'center' });
+    });
+  }
   function setSelected(cultivar) {
     selected = cultivar ? existingAlbum(cultivar) || cultivar : null;
     hideMatches();
     $('#clearCultivar').hidden = !selected && !$('#cultivarSearch').value;
     $('#selectedCultivarCard').hidden = !selected;
+    $('#useManualCultivar').hidden = !!selected;
     if (selected) {
       $('#cultivarSearch').value = selected.name;
-      $('#selectedCultivarCard').innerHTML = `<div class="selected-cultivar-heading"><strong>${esc(selected.display_name || selected.name)}</strong><span>${esc(categories[selected.species] || selected.species || 'Uncategorized')}</span></div>${chineseAliasText(selected) ? `<p class="cultivar-alias selected-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(selected))}</p>` : ''}${selected.display_name && selected.display_name !== selected.name ? `<p class="selected-cultivar-name">${esc(selected.name)}</p>` : ''}<p class="selected-cultivar-description">${esc(selected.summary_zh || selected.description || 'No description yet.')}</p>${existingAlbum(selected) ? `<p class="existing-album-note">${existingAlbum(selected).photos.length} photos already saved. New photos will be added to this album.</p>` : '<p>A new album will be created for this cultivar.</p>'}<a class="selected-cultivar-link" href="${esc(sourceURL(selected.reference_url))}" target="_blank" rel="noopener noreferrer">View cultivar record ${icon('external')}</a>`;
+      $('#selectedCultivarCard').innerHTML = `<div class="selected-cultivar-heading"><strong>${esc(selected.display_name || selected.name)}</strong><span>${esc(categories[selected.species] || selected.species || 'Uncategorized')}</span></div>${chineseAliasText(selected) ? `<p class="cultivar-alias selected-chinese-alias" lang="zh-Hans">${esc(chineseAliasText(selected))}</p>` : ''}${selected.display_name && selected.display_name !== selected.name ? `<p class="selected-cultivar-name">${esc(selected.name)}</p>` : ''}<details class="selected-cultivar-details"><summary>Cultivar details</summary><p class="selected-cultivar-description">${esc(selected.summary_zh || selected.description || 'No description yet.')}</p><a class="selected-cultivar-link" href="${esc(sourceURL(selected.reference_url))}" target="_blank" rel="noopener noreferrer">View cultivar record ${icon('external')}</a></details>${existingAlbum(selected) ? `<p class="existing-album-note">${existingAlbum(selected).photos.length} photos already saved. New photos will be added to this album.</p>` : '<p>A new album will be created for this cultivar.</p>'}`;
     }
     updateUpload();
+    revealPhotoPicker();
   }
   async function loadCatalogue(generation) {
     if (!selected) $('#catalogueStatus').textContent = 'Connecting to the cultivar catalogue… Your saved cultivars are ready to add more photos.';
@@ -652,9 +662,40 @@
     if (!album) return;
     $('#editingAlbumId').value = id;
     $('#editAlbumAddPhotos').dataset.addTo = id;
+    $('#editAlbumReload').dataset.reloadCultivar = id;
     refreshEditor('albumEditDialog');
     $('#albumEditError').textContent = '';
     openDialog('albumEditDialog');
+  }
+  async function reloadCultivar(id) {
+    if (!requireAdmin()) return;
+    const album = getAlbum(id);
+    if (!album) return;
+    const generation = sessionGeneration;
+    let cultivar;
+    loading = true; lockUI();
+    $('#editAlbumReload').textContent = 'Reloading…';
+    $('#albumEditError').textContent = '';
+    status('Reloading cultivar details from the catalogue…');
+    try {
+      let sourceName = album.name;
+      if (album.reference_url) {
+        const reference = new URL(album.reference_url);
+        if (reference.origin === 'https://camellia-nomenclature.github.io' && reference.hash) sourceName = decodeURIComponent(reference.hash.slice(1));
+      }
+      const index = await window.CamelliaCatalog.loadIndex({ refresh: true });
+      const exact = index.find(item => canonicalKey(item.name) === canonicalKey(sourceName));
+      const matches = exact ? [exact] : index.filter(item => [item.name, ...(item.chinese_name || []), ...(item.japanese_name || [])].some(name => canonicalKey(name) === canonicalKey(album.name)));
+      if (matches.length !== 1) throw new Error(matches.length ? 'Several catalogue entries match. Check the canonical name before reloading.' : 'This cultivar was not found in the catalogue. Check its canonical name before reloading.');
+      cultivar = window.CamelliaCatalog.toCultivar(await window.CamelliaCatalog.getEntry(matches[0].name));
+    } catch (error) {
+      if (generation === sessionGeneration) {
+        const message = error.message || 'Could not reload cultivar details. Please try again.';
+        $('#albumEditError').textContent = message;
+        status(message, false, true);
+      }
+    } finally { loading = false; lockUI(); $('#editAlbumReload').textContent = 'Reload cultivar details'; }
+    if (cultivar && generation === sessionGeneration) await saveAction({ type: 'REFRESH_CULTIVAR', id, cultivar }, { message: 'Reload cultivar details from the catalogue' }, '#albumEditError');
   }
   function openPhotoEdit(id) {
     if (!requireAdmin()) return;
@@ -698,6 +739,7 @@
     if (button.matches('.hero-art')) { shuffleHero(); return; }
     if (button.dataset.open) { openAlbum(button.dataset.open); return; }
     if (button.dataset.editAlbum) { openAlbumEdit(button.dataset.editAlbum); return; }
+    if (button.dataset.reloadCultivar) { reloadCultivar(button.dataset.reloadCultivar); return; }
     if (button.dataset.deleteAlbum) { deleteAlbum(button.dataset.deleteAlbum); return; }
     if (button.dataset.addTo) { openUpload(button.dataset.addTo); return; }
     if (button.matches('.add-photo,#mobileAddPhoto')) { openUpload(); return; }

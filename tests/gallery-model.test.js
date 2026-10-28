@@ -44,6 +44,79 @@ test('adding a batch preserves owner metadata and deletion updates the cover onl
  assert.equal(deleted.document.albums[0].coverPhotoId,'two');
  assert.equal(model.getState().albums[0].coverPhotoId,'one');
 });
+test('catalogue reload replaces source metadata while preserving the garden record until save',()=>{
+ const document=seed();
+ Object.assign(document.albums[0],{description:'Old description',summary_zh:'旧摘要',species:'J',color:'pink',form:'single',size:'Small',chinese_name:['旧中文'],japanese_name:['旧日本名'],reference_url:'https://example.com/old',catalogue:false,registeredYear:1978,addedAt:'2024-04-03T12:00:00.000Z',customMetadata:{season:'Spring'},aliases:['Owner alias']});
+ Object.assign(document.albums[0].photos[0],{takenAt:'2026-03-20T10:23',dateSource:'exif',dateOffset:'+08:00',customMetadata:{camera:'Owner camera'}});
+ document.albums[0].coverPhotoId='two';
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const original=plain(model.document());
+ const cultivar={id:'source-id',name:"Nuccio's Pearl",display_name:"Nuccio's Pearl",description:'New catalogue description',summary_zh:'',species:'NRH',color:'',form:'',size:'Large',chinese_name:['珍珠'],japanese_name:['パール'],reference_url:'https://camellia-nomenclature.github.io/#new',catalogue:true,registeredYear:'1985',photos:[{id:'source-photo'}],coverPhotoId:'source-photo',notes:'Source notes',addedAt:'2030-01-01T00:00:00.000Z',customMetadata:{season:'Source'},aliases:['Source alias']};
+ const sourceBefore=plain(cultivar);
+ const proposal=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar});
+ assert.equal(proposal.error,false);
+ const album=plain(proposal.document.albums[0]);
+ assert.deepEqual(album,{...original.albums[0],name:sourceBefore.name,display_name:sourceBefore.display_name,description:sourceBefore.description,summary_zh:'',species:'NRH',size:'Large',chinese_name:['珍珠'],japanese_name:['パール'],reference_url:sourceBefore.reference_url,catalogue:true,registeredYear:1985});
+ assert.deepEqual(plain(model.document()),original);
+ assert.deepEqual(cultivar,sourceBefore);
+ model.accept(proposal.document);
+ assert.deepEqual(plain(model.document().albums[0]),album);
+ const classified=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{...cultivar,color:'red',form:'double'}});
+ assert.equal(classified.document.albums[0].color,'red');
+ assert.equal(classified.document.albums[0].form,'double');
+ model.accept(classified.document);
+ for (const values of [{},{color:'   ',form:null}]) {
+  const unclassified=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:album.name,...values}});
+  assert.equal(unclassified.document.albums[0].color,'red');
+  assert.equal(unclassified.document.albums[0].form,'double');
+ }
+});
+test('catalogue reload keeps existing registration years unless the source supplies a valid year',()=>{
+ const document=seed();document.albums[0].registeredYear=1978;
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ for (const value of [undefined,null,'',999,10000,1985.5,'year 1985',true]) {
+  const cultivar={name:"Nuccio's Pearl",description:'Registered in 2001; originated in 1990.'};
+  if(value!==undefined) cultivar.registeredYear=value;
+  const proposal=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar});
+  assert.equal(proposal.error,false);
+  assert.equal(proposal.document.albums[0].registeredYear,1978);
+  model.accept(proposal.document);
+ }
+ const changed=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:"Nuccio's Pearl",registeredYear:' 1985 '}});
+ assert.equal(changed.document.albums[0].registeredYear,1985);
+ const legacy=scope.window.CamelliaModel.create(seed());legacy.setAuthenticated(true);
+ const undated=legacy.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:"Nuccio's Pearl",registeredYear:null}});
+ assert.equal(Object.hasOwn(undated.document.albums[0],'registeredYear'),false);
+});
+test('catalogue reload rejects normalized name collisions and missing records without changing data',()=>{
+ const document=seed();document.albums.push({id:'etoile',name:'Étoile de Chine',photos:[]});
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const original=plain(model.document());
+ for (const action of [
+  {id:'pearl',cultivar:{name:' e\u0301TOILE\tde CHINE ',description:'Must not save'}},
+  {id:'missing',cultivar:{name:'New name'}},
+  {id:'pearl',cultivar:{name:'   '}}
+ ]) {
+  const proposal=model.propose({type:'REFRESH_CULTIVAR',...action});
+  assert.equal(proposal.error,true);
+  assert.deepEqual(plain(proposal.document),original);
+ }
+ const renamed=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:'Étoile!',display_name:'Étoile!'}});
+ assert.equal(renamed.error,false);
+ assert.equal(renamed.document.albums.find(album=>album.id==='pearl').name,'Étoile!');
+});
+test('catalogue reload requires authenticated owner access',()=>{
+ const model=scope.window.CamelliaModel.create(seed());
+ const original=plain(model.document());
+ const action={type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:"Nuccio's Pearl",description:'Fresh description'}};
+ assert.equal(model.propose(action).error,true);
+ assert.deepEqual(plain(model.document()),original);
+ model.setAuthenticated(true);
+ assert.equal(model.propose(action).error,false);
+ model.setAuthenticated(false);
+ assert.equal(model.propose(action).error,true);
+ assert.deepEqual(plain(model.document()),original);
+});
 test('two batches append to the same cultivar while preserving owner data, photo order and cover',()=>{
  const document=seed();
  Object.assign(document.albums[0],{name:'Étoile   de Chine',display_name:'我的星光 🌸',chinese_name:'中国之星',aliases:['星光','Étoile'],description:'保留描述',summary_zh:'保留摘要',customMetadata:{season:'春 2026'}});

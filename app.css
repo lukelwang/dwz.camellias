@@ -207,7 +207,9 @@ input::-webkit-date-and-time-value { min-height: 24px; text-align: left; }
 .selected-cultivar-heading { align-items: baseline; gap: 6px 12px; }
 .selected-cultivar-heading strong { color: var(--ui-text); font-size: 17px; line-height: 1.5; }
 .selected-cultivar-heading span, .selected-cultivar-name { color: var(--ui-muted); font-family: inherit; font-size: 13px; font-style: normal; line-height: 1.6; }
-.selected-cultivar-description { margin-top: 10px; color: var(--ui-muted); font-size: 14px; line-height: 1.7; }
+.selected-cultivar-details { margin-top: 8px; }
+.selected-cultivar-details > summary { min-height: 44px; padding-block: 10px; color: var(--ui-accent); font-size: 13px; cursor: pointer; }
+.selected-cultivar-description { display: block; margin-top: 10px; color: var(--ui-muted); font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; -webkit-line-clamp: unset; }
 .selected-cultivar > p:not([class]), .existing-album-note { margin-top: 12px; color: var(--ui-accent); font-size: 13px; line-height: 1.65; }
 .selected-cultivar-link { min-height: 44px; margin-top: 12px; color: var(--ui-accent); font-size: 13px; }
 .manual-cultivar { margin-top: 12px; width: 100%; background: transparent; }
