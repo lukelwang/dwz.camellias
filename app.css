@@ -312,3 +312,18 @@ select { min-height:44px; }
 .studio-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:6px max(18px,calc((100vw - 1280px)/2)); border-bottom:1px solid var(--line); background:#151b13; color:#abb99a; font-size:11px; }
 .studio-bar > span { letter-spacing:2px; }
 .studio-bar > a { display:inline-flex; align-items:center; min-height:44px; color:#d1ddbd; }
+
+/* Cultivar aliases stay secondary to the catalogue name. */
+.cultivar-alias { font-style:normal; font-weight:400; letter-spacing:.25px; line-height:1.6; overflow-wrap:anywhere; }
+.hero-chinese-alias { display:block; margin-top:7px; color:#d5dfc9; font-size:14px; }
+.card-chinese-alias { margin-top:5px; color:var(--muted); font-size:12px; }
+.album-chinese-alias { margin-top:7px; color:var(--muted); font-size:13px; }
+.selected-chinese-alias { margin-top:7px; color:#b9c7a8; font-size:12px; }
+@media(max-width:580px) { .hero-chinese-alias { font-size:13px; } .card-chinese-alias { font-size:11px; } }
+@media(max-width:580px) {
+  html[data-dark="true"] .hero-art-top { display:none; }
+  .site-header .brand, .site-footer .brand { min-width:0; max-width:100%; flex-shrink:1; }
+  .site-header .brand > span, .site-footer .brand > span { min-width:0; overflow-wrap:anywhere; }
+  .site-footer { flex-wrap:wrap; }
+  .site-footer > span { margin-left:auto; }
+}
