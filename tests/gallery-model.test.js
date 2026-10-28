@@ -104,3 +104,87 @@ test('edits preserve unknown accepted top-level gallery metadata',()=>{
  const refreshed={...document,extraMetadata:{gardenSeason:'2027/2028'}};model.accept(refreshed);
  assert.deepEqual(plain(model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{notes:'备注'}}).document.extraMetadata),refreshed.extraMetadata);
 });
+test('only new albums receive an immutable creation timestamp',()=>{
+ const document=seed();
+ document.albums[0].addedAt='2024-04-03T12:00:00.000Z';
+ document.albums[0].registeredYear=1978;
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const before=Date.now();
+ const created=model.propose({type:'ADD_PHOTOS',cultivar:{id:'gem',name:"Nuccio's Gem",addedAt:'1900-01-01T00:00:00.000Z',registeredYear:'1972'},photos:[{id:'gem-one'}]});
+ const gem=created.document.albums.find(album=>album.id==='gem');
+ assert.equal(new Date(gem.addedAt).toISOString(),gem.addedAt);
+ assert.ok(Date.parse(gem.addedAt)>=before && Date.parse(gem.addedAt)<=Date.now());
+ assert.equal(gem.registeredYear,1972);
+ assert.equal(model.getState().albums.length,1);
+ model.accept(created.document);
+ const appended=model.propose({type:'ADD_PHOTOS',cultivar:{id:'pearl',addedAt:'2030-01-01T00:00:00.000Z',registeredYear:2020},photos:[{id:'three'}]});
+ const pearl=appended.document.albums.find(album=>album.id==='pearl');
+ assert.equal(pearl.addedAt,document.albums[0].addedAt);
+ assert.equal(pearl.registeredYear,1978);
+ model.accept(appended.document);
+ const edited=model.propose({type:'PATCH_ALBUM',id:'gem',patch:{notes:'Updated',addedAt:'2030-01-01T00:00:00.000Z'}});
+ assert.equal(edited.document.albums.find(album=>album.id==='gem').addedAt,gem.addedAt);
+});
+test('legacy albums stay undated when photos are appended or metadata is edited',()=>{
+ const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
+ const appended=model.propose({type:'ADD_PHOTOS',cultivar:{id:'pearl',addedAt:'2026-01-01T00:00:00.000Z'},photos:[{id:'three',takenAt:'2026-01-01T00:00:00.000Z'}]});
+ assert.equal(Object.hasOwn(appended.document.albums[0],'addedAt'),false);
+ model.accept(appended.document);
+ const edited=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{registeredYear:'1985'}});
+ assert.equal(Object.hasOwn(edited.document.albums[0],'addedAt'),false);
+ assert.equal(scope.window.CamelliaModel.addedTime(edited.document.albums[0]),null);
+});
+test('registration years accept four digits and blank clears while invalid changes are rejected',()=>{
+ const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
+ for (const [input,expected] of [[1000,1000],[9999,9999],[' 1985 ',1985],['',null],['   ',null],[null,null]]) {
+  const proposal=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{registeredYear:input}});
+  assert.equal(proposal.error,false);
+  assert.equal(proposal.document.albums[0].registeredYear,expected);
+  model.accept(proposal.document);
+ }
+ const original=plain(model.document());
+ for (const input of [999,10000,1985.5,'85','1985.0','1e3','unknown',true,[],{},undefined]) {
+  const proposal=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{registeredYear:input,notes:'must not save'}});
+  assert.equal(proposal.error,true);
+  assert.match(proposal.notice,/four-digit year/);
+  assert.deepEqual(plain(proposal.document),original);
+ }
+});
+test('metadata helpers treat unknown values honestly without guessing from other fields',()=>{
+ const {registrationYear,addedTime}=scope.window.CamelliaModel;
+ for (const value of [undefined,null,'',999,10000,2026.5,'2026.0','year 2026',false,[]]) assert.equal(registrationYear(value),null);
+ assert.equal(registrationYear('2008'),2008);
+ assert.equal(registrationYear(2011),2011);
+ assert.equal(addedTime({addedAt:'2026-10-28T12:00:00.000Z'}),Date.parse('2026-10-28T12:00:00.000Z'));
+ for (const album of [{},{addedAt:''},{addedAt:'unknown'},{addedAt:0},{createdAt:'2026-10-28T12:00:00.000Z',photos:[{takenAt:'2026-10-28T12:00:00.000Z'}]}]) assert.equal(addedTime(album),null);
+});
+test('album sorting copies input and preserves visit order for random order',()=>{
+ const {orderAlbums}=scope.window.CamelliaModel;
+ const albums=[
+  {id:'unknown-z',name:'Zeta',description:'Registered in 2025',photos:[{},{}]},
+  {id:'old',name:'Alpha',addedAt:'2024-01-01T00:00:00.000Z',registeredYear:1980,photos:[]},
+  {id:'new-z',name:'Zeta',addedAt:'2026-01-01T00:00:00.000Z',registeredYear:'2000',photos:[{}]},
+  {id:'new-a',name:'Beta',addedAt:'2026-01-01T00:00:00.000Z',registeredYear:2000,photos:[]},
+  {id:'invalid',name:'Gamma',addedAt:'unknown',registeredYear:'year 2026',photos:[]}
+ ];
+ const original=plain(albums);
+ const ids=items=>Array.from(items,album=>album.id);
+ assert.notEqual(orderAlbums(albums),albums);
+ assert.deepEqual(ids(orderAlbums(albums)),ids(albums));
+ assert.deepEqual(ids(orderAlbums(albums,{sort:'curated'})),ids(albums));
+ assert.deepEqual(ids(orderAlbums(albums,{sort:'name'})),['old','new-a','invalid','unknown-z','new-z']);
+ assert.deepEqual(ids(orderAlbums(albums,{sort:'photos'})),['unknown-z','new-z','old','new-a','invalid']);
+ assert.deepEqual(ids(orderAlbums(albums,{sort:'newly-added'})),['new-z','new-a','old','unknown-z','invalid']);
+ assert.deepEqual(ids(orderAlbums(albums,{sort:'registered-year'})),['new-a','new-z','old','invalid','unknown-z']);
+ assert.deepEqual(albums,original);
+});
+test('favorites are absent from model state and the former toggle action is unsupported',()=>{
+ const model=scope.window.CamelliaModel.create(seed());
+ assert.equal(Object.hasOwn(model.getState(),'favorites'),false);
+ const proposal=model.propose({type:'TOGGLE_FAVORITE',id:'pearl'});
+ assert.equal(proposal.error,true);
+ assert.match(proposal.notice,/not supported/);
+ assert.equal(Object.hasOwn(proposal,'favorites'),false);
+ model.accept(proposal.document);
+ assert.equal(Object.hasOwn(model.getState(),'favorites'),false);
+});

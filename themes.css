@@ -90,7 +90,6 @@ html[data-style="garden"] .card-latin { font-family: Georgia, serif; font-style:
 html[data-style="garden"] .card-tags > span { border-radius: 1px; background: #e8ebdf; color: #65785c; }
 
 html[data-style="garden"] .card-number { display: block; position: absolute; top: 12px; left: 12px; z-index: 1; padding: 6px 8px; font-size: 10px; border-radius: 0; font-family: Georgia, serif; background: #faf7eee8; color: #536647; letter-spacing: 1px; }
-html[data-style="garden"] .favorite-button { border-radius: 50%; }
 html[data-style="garden"] .gallery-end { font-family: var(--journal-serif); letter-spacing: 3px; }
 html[data-style="garden"] .garden-note { border: 1px solid #cdd4be; border-radius: 0; background: #e8ecdd; }
 html[data-style="garden"] .garden-note h2 { font-family: var(--journal-serif); font-weight: 400; letter-spacing: 1px; }
@@ -170,8 +169,6 @@ html[data-dark="true"] .search-box kbd { background: #252d20; border-color: #465
 html[data-dark="true"] .filter-toggle { border-radius: 2px; background: #191e17; border-color: #3b4533; color: #c4cfb7; }
 html[data-dark="true"] .category-tabs button { border-radius: 2px; color: #9da891; }
 html[data-dark="true"] .category-tabs button.selected { color: #d9e5c6; background: #2d3825; }
-html[data-dark="true"] #favoritesFilter { color: #aebba0; }
-html[data-dark="true"] #favoritesFilter[aria-pressed="true"] { background: #34432a; color: #e4eecd; }
 html[data-dark="true"] .sort-label select { color: #b1bda4; border-color: #3b4533; background: #191e17; border-radius: 2px; }
 html[data-dark="true"] .more-filters { background: #1c2318; border-color: #384530; border-radius: 2px; }
 html[data-dark="true"] select { color: #e1e8d6; background: #20291a; border-color: #435338; }
@@ -186,8 +183,6 @@ html[data-dark="true"] .card-latin { color: #839074; }
 html[data-dark="true"] .card-tags > span { border-radius: 1px; background: #26311f; color: #aebc9d; }
 
 html[data-dark="true"] .card-number { background: #11180dde; color: #bfcfa8; border-radius: 1px; font-size: 9px; letter-spacing: 2px; }
-html[data-dark="true"] .favorite-button { background: #11180dcf; color: #d3dec4; border: 1px solid #a7b69745; }
-html[data-dark="true"] .favorite-button[aria-pressed="true"] { color: #e2bead; background: #392d24; }
 html[data-dark="true"] .gallery-end { color: #7c8a6e; letter-spacing: 2px; }
 html[data-dark="true"] .garden-note { background: #1a2215; border: 1px solid #35432c; border-radius: 2px; }
 html[data-dark="true"] .garden-note h2 { font-weight: 300; color: #dce7cb; }

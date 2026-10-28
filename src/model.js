@@ -7,13 +7,37 @@
     description: 'A garden of more than 400 camellia cultivars.\nPhotographed, remembered, and grown with care.',
     gardenCount: '400+'
   };
-  const ALBUM_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'notes'];
+  const ALBUM_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'notes', 'registeredYear'];
   const PHOTO_FIELDS = ['caption', 'takenAt', 'dateSource', 'dateOffset'];
   const ADMIN_ACTIONS = ['ADD_PHOTOS', 'PATCH_ALBUM', 'PATCH_PHOTO', 'DELETE_PHOTO', 'DELETE_ALBUM', 'SET_COVER', 'MOVE_PHOTO', 'PATCH_SETTINGS'];
   const select = (object, fields) => Object.fromEntries(fields.filter(key => Object.hasOwn(object, key)).map(key => [key, object[key]]));
   const sourceURL = name => 'https://camellia-nomenclature.github.io/#' + encodeURIComponent(name);
   const canonicalName = name => typeof name === 'string' ? name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase() : '';
   const withoutFrame = ({ frame, ...value }) => value;
+
+  function registrationYear(value) {
+    if (typeof value === 'string') {
+      if (!/^\d{4}$/.test(value.trim())) return null;
+      value = Number(value.trim());
+    }
+    return Number.isInteger(value) && value >= 1000 && value <= 9999 ? value : null;
+  }
+
+  function addedTime(album) {
+    const time = typeof album.addedAt === 'string' && album.addedAt.trim() ? Date.parse(album.addedAt) : NaN;
+    return Number.isFinite(time) ? time : null;
+  }
+
+  function orderAlbums(albums, { sort = 'curated' } = {}) {
+    const result = albums.slice();
+    const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+    const descendingKnown = (a, b) => a === null ? (b === null ? 0 : 1) : (b === null ? -1 : b - a);
+    if (sort === 'newly-added') result.sort((a, b) => descendingKnown(addedTime(a), addedTime(b)));
+    else if (sort === 'registered-year') result.sort((a, b) => descendingKnown(registrationYear(a.registeredYear), registrationYear(b.registeredYear)) || byName(a, b));
+    else if (sort === 'name') result.sort(byName);
+    else if (sort === 'photos') result.sort((a, b) => (b.photos || []).length - (a.photos || []).length);
+    return result;
+  }
 
   function shuffle(albums) {
     const result = albums.slice();
@@ -44,7 +68,7 @@
     let nextAlbumNumber = 1;
     let nextPhotoNumber = 1;
     let state = {
-      role: 'visitor', albums: shuffle((document.albums || []).map(copyAlbum)), favorites: [],
+      role: 'visitor', albums: shuffle((document.albums || []).map(copyAlbum)),
       settings: { ...SETTINGS, ...document.settings }, revision: 0,
       lastAction: '', history: [], notice: '', error: false
     };
@@ -65,11 +89,6 @@
 
     function dispatch(action) {
       const type = action.type;
-      if (type === 'TOGGLE_FAVORITE') {
-        if (!state.albums.some(album => album.id === action.id)) return finish({}, 'This cultivar album no longer exists.', true);
-        const exists = state.favorites.includes(action.id);
-        return finish({ favorites: exists ? state.favorites.filter(id => id !== action.id) : [...state.favorites, action.id] }, exists ? 'Removed from favorites.' : 'Added this cultivar to favorites.');
-      }
       if (ADMIN_ACTIONS.includes(type) && state.role !== 'admin') {
         return finish({}, 'Verify the owner account before editing the garden.', true);
       }
@@ -89,7 +108,7 @@
           if (!id || !/^[A-Za-z0-9_-]{1,160}$/.test(id) || state.albums.some(item => item.id === id)) {
             do { id = `cultivar-${nextAlbumNumber++}`; } while (state.albums.some(item => item.id === id));
           }
-          album = copyAlbum({ ...cultivar, id, name: cultivar.name.trim(), display_name: cultivar.display_name || cultivar.name.trim(), reference_url: sourceURL(cultivar.name.trim()), photos: [] });
+          album = copyAlbum({ ...cultivar, id, name: cultivar.name.trim(), display_name: cultivar.display_name || cultivar.name.trim(), reference_url: sourceURL(cultivar.name.trim()), registeredYear: registrationYear(cultivar.registeredYear), addedAt: new Date().toISOString(), photos: [] });
         }
         const usedIds = new Set(state.albums.flatMap(item => item.photos.map(photo => photo.id)));
         const photos = action.photos.map(photo => {
@@ -108,6 +127,13 @@
       }
       if (type === 'PATCH_ALBUM') {
         const patch = select(action.patch || {}, ALBUM_FIELDS);
+        if (Object.hasOwn(patch, 'registeredYear')) {
+          const value = patch.registeredYear;
+          patch.registeredYear = registrationYear(value);
+          if (patch.registeredYear === null && value !== null && !(typeof value === 'string' && !value.trim())) {
+            return finish({}, 'Registration year must be a four-digit year from 1000 to 9999, or blank.', true);
+          }
+        }
         if (Object.hasOwn(patch, 'name')) {
           patch.name = String(patch.name || '').trim();
           if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
@@ -118,7 +144,7 @@
       }
       if (type === 'DELETE_ALBUM') {
         if (!state.albums.some(album => album.id === action.id)) return finish({}, 'This cultivar album no longer exists.', true);
-        return finish({ albums: state.albums.filter(album => album.id !== action.id), favorites: state.favorites.filter(id => id !== action.id) }, 'Cultivar and all its photos deleted.');
+        return finish({ albums: state.albums.filter(album => album.id !== action.id) }, 'Cultivar and all its photos deleted.');
       }
       if (['PATCH_PHOTO', 'DELETE_PHOTO', 'SET_COVER', 'MOVE_PHOTO'].includes(type)) {
         const album = state.albums.find(item => item.id === action.albumId);
@@ -163,7 +189,7 @@
       const previousCount = rank.size;
       newcomers.forEach((album, index) => rank.set(album.id, previousCount + index));
       incoming.sort((a, b) => rank.get(a.id) - rank.get(b.id));
-      state = { ...state, albums: incoming, settings: { ...SETTINGS, ...document.settings }, error: false, favorites: state.favorites.filter(id => incoming.some(album => album.id === id)) };
+      state = { ...state, albums: incoming, settings: { ...SETTINGS, ...document.settings }, error: false };
       return state;
     }
     function propose(action) {
@@ -178,5 +204,5 @@
     return { getState: () => state, dispatch, propose, accept, setAuthenticated, document: documentValue };
   }
 
-  window.CamelliaModel = { create };
+  window.CamelliaModel = { create, registrationYear, addedTime, orderAlbums };
 })();

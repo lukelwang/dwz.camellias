@@ -23,6 +23,12 @@
     return value.filter(item => item.trim());
   }
 
+  function registrationYear(raw) {
+    const value = raw.registeredYear ?? raw.registered_year ?? raw.registration_year;
+    const year = typeof value === 'string' && /^\d{4}$/.test(value.trim()) ? Number(value.trim()) : value;
+    return Number.isInteger(year) && year >= 1000 && year <= 9999 ? year : null;
+  }
+
   function entry(raw, fallbackName) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       throw new Error('The live catalogue returned an invalid variety. Please retry.');
@@ -35,6 +41,7 @@
     return {
       name,
       species: species || '',
+      registeredYear: registrationYear(raw),
       chinese_name: aliases(raw.chinese_name, 'Chinese names'),
       japanese_name: aliases(raw.japanese_name, 'Japanese names')
     };

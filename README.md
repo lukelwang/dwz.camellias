@@ -19,6 +19,12 @@ Open the separate owner page shared directly with the owner and choose **Create 
 
 The token remains only in current-page memory. Refresh/close/logout clears the site's session, so the next management session needs the token again. GitHub still controls token expiry/revocation. The website never stores the token in localStorage, sessionStorage, IndexedDB, URLs or repository files. Authenticated requests go only to `https://api.github.com`; public photos and JSON are read from `raw.githubusercontent.com`. No remote scripts, analytics, or remote fonts are loaded.
 
+## Browsing and sorting
+
+Favorites have been removed. The **Sort by** menu lists Random order, Newly added, Registered year, Cultivar A–Z and Photo count. Random order is shuffled once per visit. Newly added uses the cultivar album’s first addition timestamp; adding more photos preserves it. Registered year sorts newest first, with unknown years last. Explicit registration years from the source catalogue are imported, and the owner can add or clear the year in Edit cultivar. Publication and origin dates are not treated as registration years.
+
+Gallery cards and album stages show centered square crops for portrait and landscape photos. Fullscreen viewing shows the complete image; saved photo files are unchanged.
+
 ## Photos and durable changes
 
 Select one cultivar from the live catalogue or your saved albums, choose multiple images, check captions and dates, then save. Saved cultivars are marked **In your garden · Add photos**; selecting one appends the batch to the same album, preserving its cover and details. The browser generates a display JPEG (up to 2560 pixels on its longest edge) and a thumbnail (up to 640 pixels). The original files stay in your photo library; this is a gallery rather than an original-photo archive. Capture time comes from EXIF DateTimeOriginal, is shown in the camera's local time, and can be edited. Missing capture dates stay blank. Generated JPEGs do not retain embedded EXIF/GPS; capture time and its source remain in the album index.
