@@ -63,13 +63,72 @@ test('catalogue reload replaces source metadata while preserving the garden reco
  assert.deepEqual(plain(model.document().albums[0]),album);
  const classified=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{...cultivar,color:'red',form:'double'}});
  assert.equal(classified.document.albums[0].color,'red');
- assert.equal(classified.document.albums[0].form,'double');
+ assert.deepEqual(plain(classified.document.albums[0].form),['double']);
  model.accept(classified.document);
  for (const values of [{},{color:'   ',form:null}]) {
   const unclassified=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:album.name,...values}});
   assert.equal(unclassified.document.albums[0].color,'red');
-  assert.equal(unclassified.document.albums[0].form,'double');
+  assert.deepEqual(plain(unclassified.document.albums[0].form),['double']);
  }
+});
+test('flower forms read legacy values and normalize multiple selections without changing saved records',()=>{
+ const {flowerForms}=scope.window.CamelliaModel;
+ assert.deepEqual(plain(flowerForms(' single ')),['single']);
+ assert.deepEqual(plain(flowerForms('')),[]);
+ assert.deepEqual(plain(flowerForms(['single',' semi_double ','single','','semi_double'])),['single','semi_double']);
+ for (const value of [undefined,null,42,true,{},['single',false]]) assert.deepEqual(plain(flowerForms(value)),[]);
+ const document=seed();document.albums[0].form='single';
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ assert.equal(model.document().albums[0].form,'single');
+ const unrelated=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{notes:'New garden note'}});
+ assert.equal(unrelated.document.albums[0].form,'single');
+ model.accept(unrelated.document);
+ assert.equal(model.document().albums[0].form,'single');
+ assert.equal(document.albums[0].form,'single');
+});
+test('owner flower form edits save multiple normalized selections and can clear them',()=>{
+ const document=seed();document.albums[0].form='single';
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const input=[' single ','semi_double','single','','   '];
+ const multiple=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{form:input}});
+ assert.equal(multiple.error,false);
+ assert.deepEqual(plain(multiple.document.albums[0].form),['single','semi_double']);
+ assert.equal(model.document().albums[0].form,'single');
+ assert.deepEqual(input,[' single ','semi_double','single','','   ']);
+ model.accept(multiple.document);
+ assert.deepEqual(plain(model.document().albums[0].form),['single','semi_double']);
+ const scalar=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{form:' double '}});
+ assert.deepEqual(plain(scalar.document.albums[0].form),['double']);
+ for (const value of [[], '']) {
+  const cleared=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{form:value}});
+  assert.equal(cleared.error,false);
+  assert.deepEqual(plain(cleared.document.albums[0].form),[]);
+ }
+ const original=plain(model.document());
+ for (const value of [undefined,null,42,true,{},['single',null],['single',{}],new Array(1)]) {
+  const invalid=model.propose({type:'PATCH_ALBUM',id:'pearl',patch:{form:value,notes:'Must not save'}});
+  assert.equal(invalid.error,true);
+  assert.match(invalid.notice,/Flower forms/);
+  assert.deepEqual(plain(invalid.document),original);
+ }
+});
+test('catalogue reload preserves owner forms unless the source provides nonempty valid selections',()=>{
+ const document=seed();document.albums[0].form=['single','semi_double'];
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ for (const fields of [{},{form:''},{form:'   '},{form:[]},{form:['','   ']},{form:null},{form:42},{form:['double',false]}]) {
+  const proposal=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:"Nuccio's Pearl",...fields}});
+  assert.equal(proposal.error,false);
+  assert.deepEqual(plain(proposal.document.albums[0].form),['single','semi_double']);
+  model.accept(proposal.document);
+ }
+ const input=[' formal_double ','double','formal_double',''];
+ const updated=model.propose({type:'REFRESH_CULTIVAR',id:'pearl',cultivar:{name:"Nuccio's Pearl",form:input}});
+ assert.equal(updated.error,false);
+ assert.deepEqual(plain(updated.document.albums[0].form),['formal_double','double']);
+ assert.deepEqual(input,[' formal_double ','double','formal_double','']);
+ assert.deepEqual(plain(model.document().albums[0].form),['single','semi_double']);
+ model.accept(updated.document);
+ assert.deepEqual(plain(model.document().albums[0].form),['formal_double','double']);
 });
 test('catalogue reload keeps existing registration years unless the source supplies a valid year',()=>{
  const document=seed();document.albums[0].registeredYear=1978;

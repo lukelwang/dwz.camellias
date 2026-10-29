@@ -15,6 +15,13 @@
   const sourceURL = name => 'https://camellia-nomenclature.github.io/#' + encodeURIComponent(name);
   const canonicalName = name => typeof name === 'string' ? name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase() : '';
   const withoutFrame = ({ frame, ...value }) => value;
+  const validFlowerForms = value => typeof value === 'string' || (Array.isArray(value) && Array.from(value).every(form => typeof form === 'string'));
+
+  function flowerForms(value) {
+    if (!validFlowerForms(value)) return [];
+    const forms = Array.isArray(value) ? value : [value];
+    return [...new Set(forms.map(form => form.trim()).filter(Boolean))];
+  }
 
   function registrationYear(value) {
     if (typeof value === 'string') {
@@ -129,9 +136,10 @@
       if (type === 'REFRESH_CULTIVAR') {
         const cultivar = action.cultivar || {};
         const patch = select(cultivar, CATALOGUE_FIELDS);
-        for (const field of ['color', 'form']) {
-          if (typeof patch[field] !== 'string' || !patch[field].trim()) delete patch[field];
-        }
+        if (typeof patch.color !== 'string' || !patch.color.trim()) delete patch.color;
+        const forms = flowerForms(patch.form);
+        if (forms.length) patch.form = forms;
+        else delete patch.form;
         patch.name = typeof cultivar.name === 'string' ? cultivar.name.trim() : '';
         if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
         if (state.albums.some(album => album.id !== action.id && canonicalName(album.name) === canonicalName(patch.name))) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
@@ -141,6 +149,10 @@
       }
       if (type === 'PATCH_ALBUM') {
         const patch = select(action.patch || {}, ALBUM_FIELDS);
+        if (Object.hasOwn(patch, 'form')) {
+          if (!validFlowerForms(patch.form)) return finish({}, 'Flower forms must be a name or a list of names.', true);
+          patch.form = flowerForms(patch.form);
+        }
         if (Object.hasOwn(patch, 'registeredYear')) {
           const value = patch.registeredYear;
           patch.registeredYear = registrationYear(value);
@@ -218,5 +230,5 @@
     return { getState: () => state, dispatch, propose, accept, setAuthenticated, document: documentValue };
   }
 
-  window.CamelliaModel = { create, registrationYear, addedTime, orderAlbums };
+  window.CamelliaModel = { create, flowerForms, registrationYear, addedTime, orderAlbums };
 })();
