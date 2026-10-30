@@ -32,6 +32,22 @@ test('record links default to visible and the owner can persist visibility witho
  assert.equal(model.getState().settings.showCultivarRecordLinks,false);
  assert.deepEqual(plain(model.document().albums),original);
 });
+test('legacy album loads and refreshes with its saved cover first without changing the input document',()=>{
+ const document=seed();
+ document.albums[0].photos=Array.from({length:7},(_,index)=>({id:'photo-'+index,caption:'Bloom '+index,takenAt:'2026-10-30T09:24',customMetadata:{index}}));
+ document.albums[0].coverPhotoId='photo-4';
+ const original=plain(document);
+ const model=scope.window.CamelliaModel.create(document);
+ const expected=[4,0,1,2,3,5,6].map(index=>'photo-'+index);
+ assert.deepEqual(plain(model.getState().albums[0].photos.map(photo=>photo.id)),expected);
+ assert.deepEqual(plain(model.document().albums[0].photos.map(photo=>photo.id)),expected);
+ assert.deepEqual(document,original);
+ const refreshed=plain(document);refreshed.albums[0].coverPhotoId='photo-6';
+ model.accept(refreshed);
+ assert.deepEqual(plain(model.getState().albums[0].photos.map(photo=>photo.id)),[6,0,1,2,3,4,5].map(index=>'photo-'+index));
+ assert.deepEqual(refreshed.albums[0].photos,original.albums[0].photos);
+ assert.deepEqual(plain(model.getState().albums[0].photos.find(photo=>photo.id==='photo-4').customMetadata),{index:4});
+});
 test('setting a cover moves that photo first while keeping all other photos and metadata until save',()=>{
  const document=seed();
  Object.assign(document.albums[0],{addedAt:'2025-03-01T12:00:00.000Z',customMetadata:{location:'Garden'}});
@@ -58,6 +74,22 @@ test('an existing cover can move first and choosing it again does not duplicate 
   assert.equal(proposal.document.albums[0].coverPhotoId,'two');
   model.accept(proposal.document);
  }
+});
+test('manual photo ordering keeps the cover pinned while other photos can move',()=>{
+ const document=seed();
+ document.albums[0].coverPhotoId='two';
+ document.albums[0].photos.push({id:'three'},{id:'four'});
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const original=plain(model.document());
+ for(const [photoId,direction] of [['two',1],['one',-1]]){
+  const proposal=model.propose({type:'MOVE_PHOTO',albumId:'pearl',photoId,direction});
+  assert.equal(proposal.error,true);
+  assert.deepEqual(plain(proposal.document),original);
+ }
+ const proposal=model.propose({type:'MOVE_PHOTO',albumId:'pearl',photoId:'four',direction:-1});
+ assert.equal(proposal.error,false);
+ assert.deepEqual(plain(proposal.document.albums[0].photos.map(photo=>photo.id)),['two','one','four','three']);
+ assert.equal(proposal.document.albums[0].coverPhotoId,'two');
 });
 test('adding a batch preserves owner metadata and deletion updates the cover only on accept',()=>{
  const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
@@ -298,12 +330,12 @@ test('two batches append to the same cultivar while preserving owner data, photo
  const first=model.propose({type:'ADD_PHOTOS',cultivar:{name:' e\u0301TOILE\tde chine ',display_name:'Catalogue name',chinese_name:'新中文',aliases:['新别名'],notes:'New notes'},photos:[{id:'three',caption:'春花'}]});
  assert.equal(first.error,false);
  assert.equal(first.document.albums.length,1);
- assert.deepEqual(plain(first.document.albums[0].photos.map(photo=>photo.id)),['one','two','three']);
+ assert.deepEqual(plain(first.document.albums[0].photos.map(photo=>photo.id)),['two','one','three']);
  model.accept(first.document);
  const second=model.propose({type:'ADD_PHOTOS',cultivar:{name:'ÉTOILE de CHINE'},photos:[{id:'four',caption:'秋花'}]});
  assert.equal(second.document.albums.length,1);
  const album=plain(second.document.albums[0]);
- assert.deepEqual(album.photos.map(photo=>photo.id),['one','two','three','four']);
+ assert.deepEqual(album.photos.map(photo=>photo.id),['two','one','three','four']);
  assert.deepEqual({...album,photos:album.photos.slice(0,2)},original);
  assert.equal(model.getState().albums[0].photos.length,3);
  model.accept(second.document);

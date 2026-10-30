@@ -64,6 +64,8 @@
       caption: photo.caption || '', filename: photo.filename || '',
       takenAt: photo.takenAt || '', dateSource: photo.dateSource || 'unknown'
     }));
+    const coverIndex = photos.findIndex(photo => photo.id === album.coverPhotoId);
+    if (coverIndex > 0) photos.unshift(...photos.splice(coverIndex, 1));
     return {
       ...withoutFrame(album), photos, notes: album.notes || '',
       coverPhotoId: photos.some(photo => photo.id === album.coverPhotoId) ? album.coverPhotoId : (photos[0]?.id || null)
@@ -207,6 +209,7 @@
         const index = album.photos.indexOf(photo);
         const target = index + action.direction;
         if (target < 0 || target >= album.photos.length) return finish({}, 'The photo is already at the end in that direction.');
+        if (photo.id === album.coverPhotoId || album.photos[target].id === album.coverPhotoId) return finish({}, 'The cover stays first. Choose a different cover to move this photograph.', true);
         return updateAlbum(album.id, item => {
           const photos = item.photos.slice();
           [photos[index], photos[target]] = [photos[target], photos[index]];
