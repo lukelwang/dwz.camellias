@@ -176,6 +176,91 @@ test('catalogue reload requires authenticated owner access',()=>{
  assert.equal(model.propose(action).error,true);
  assert.deepEqual(plain(model.document()),original);
 });
+test('reselecting a catalogue cultivar replaces its identity in one proposal while preserving the album and every photo',()=>{
+ const document=seed();
+ Object.assign(document.albums[0],{description:'Wrong cultivar description',summary_zh:'旧摘要',species:'J',color:'pink',form:['single'],size:'Small',chinese_name:['旧中文'],japanese_name:['旧日本名'],reference_url:'https://example.com/wrong',catalogue:false,registeredYear:1978,addedAt:'2024-04-03T12:00:00.000Z',customMetadata:{season:'Spring'},aliases:['Owner alias']});
+ document.albums[0].photos=Array.from({length:6},(_,index)=>({id:'photo-'+index,filename:'bloom-'+index+'.jpg',caption:'花 '+index,url:'/photos/'+index+'.jpg',takenAt:'2026-03-20T10:2'+index,dateSource:'exif',dateOffset:'+08:00',customMetadata:{camera:'Owner camera',index}}));
+ document.albums[0].coverPhotoId='photo-4';
+ document.albums.push({id:'gem',name:"Nuccio's Gem",photos:[]});
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const original=plain(model.document());
+ const cultivar={id:'source-identity',name:'  Étoile de Chine  ',display_name:'中国之星',description:'Correct catalogue description',summary_zh:'正确摘要',species:'NRH',color:' red ',form:[' formal_double ','double','formal_double'],size:'Large',chinese_name:['中国之星'],japanese_name:['中国の星'],reference_url:'https://camellia-nomenclature.github.io/#correct',catalogue:true,registeredYear:'1985',notes:'Source notes',photos:[{id:'source-photo'}],coverPhotoId:'source-photo',addedAt:'2030-01-01T00:00:00.000Z',customMetadata:{season:'Source'},aliases:['Source alias']};
+ const sourceBefore=plain(cultivar);
+ const proposal=model.propose({type:'REASSIGN_CULTIVAR',id:'pearl',cultivar});
+ assert.equal(proposal.error,false);
+ assert.equal(proposal.document.albums.length,2);
+ assert.deepEqual(plain(proposal.document.albums.map(album=>album.id)),original.albums.map(album=>album.id));
+ const album=plain(proposal.document.albums.find(album=>album.id==='pearl'));
+ assert.deepEqual(album,{...original.albums.find(album=>album.id==='pearl'),name:'Étoile de Chine',display_name:sourceBefore.display_name,description:sourceBefore.description,summary_zh:sourceBefore.summary_zh,species:'NRH',color:' red ',form:['formal_double','double'],size:'Large',chinese_name:sourceBefore.chinese_name,japanese_name:sourceBefore.japanese_name,reference_url:sourceBefore.reference_url,catalogue:true,registeredYear:1985});
+ assert.deepEqual(plain(model.document()),original);
+ assert.deepEqual(cultivar,sourceBefore);
+ model.accept(proposal.document);
+ assert.deepEqual(plain(model.document()),plain(proposal.document));
+});
+test('reselecting clears a stale registration year while retaining manual classification when the new source is blank',()=>{
+ const document=seed();Object.assign(document.albums[0],{registeredYear:1978,color:'pink',form:['single','semi_double']});
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ for (const fields of [{},{registeredYear:null,color:'   ',form:[]},{registeredYear:'unknown',color:null,form:['double',false]},{registeredYear:999,form:''}]) {
+  const proposal=model.propose({type:'REASSIGN_CULTIVAR',id:'pearl',cultivar:{name:'Correct cultivar',...fields}});
+  assert.equal(proposal.error,false);
+  assert.equal(proposal.document.albums[0].registeredYear,null);
+  assert.equal(proposal.document.albums[0].color,'pink');
+  assert.deepEqual(plain(proposal.document.albums[0].form),['single','semi_double']);
+  assert.equal(model.document().albums[0].registeredYear,1978);
+ }
+});
+test('reselecting overlays explicit editor fields atomically and ignores protected fields in the editor patch',()=>{
+ const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
+ const original=plain(model.document());
+ const patch={name:'  Manual name  ',display_name:'我的新茶花',description:'Manual description',summary_zh:'手动摘要',species:'Manual species',color:'white',form:[' single ','double','single'],size:'Medium',notes:'Pending garden notes',registeredYear:' 2001 ',id:'new-id',photos:[],coverPhotoId:null,addedAt:'2030-01-01T00:00:00.000Z',reference_url:'https://example.com/injected',chinese_name:['Injected']};
+ const patchBefore=plain(patch);
+ const proposal=model.propose({type:'REASSIGN_CULTIVAR',id:'pearl',cultivar:{name:'Catalogue name',display_name:'Source name',description:'Source description',summary_zh:'Source summary',species:'J',color:'red',form:'formal_double',size:'Large',registeredYear:1985,chinese_name:['新别名'],reference_url:'https://example.com/source'},patch});
+ assert.equal(proposal.error,false);
+ assert.deepEqual(plain(proposal.document.albums[0]),{...original.albums[0],name:'Manual name',display_name:patch.display_name,description:patch.description,summary_zh:patch.summary_zh,species:patch.species,color:'white',form:['single','double'],size:'Medium',notes:'Pending garden notes',registeredYear:2001,chinese_name:['新别名'],reference_url:'https://camellia-nomenclature.github.io/#Manual%20name'});
+ assert.deepEqual(patch,patchBefore);
+ assert.deepEqual(plain(model.document()),original);
+ const cleared=model.propose({type:'REASSIGN_CULTIVAR',id:'pearl',cultivar:{name:'Catalogue name',registeredYear:1985,form:'double'},patch:{notes:'',registeredYear:'',form:[]}});
+ assert.equal(cleared.error,false);
+ assert.equal(cleared.document.albums[0].notes,'');
+ assert.equal(cleared.document.albums[0].registeredYear,null);
+ assert.deepEqual(plain(cleared.document.albums[0].form),[]);
+});
+test('reselecting rejects collisions, invalid names, missing albums and malformed editor fields without partial changes',()=>{
+ const document=seed();document.albums.push({id:'etoile',name:'Étoile de Chine',photos:[{id:'other-photo'}]});
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ const original=plain(model.document());
+ const action={type:'REASSIGN_CULTIVAR',id:'pearl',cultivar:{name:'Correct cultivar',description:'Must not save'},patch:{notes:'Must not save'}};
+ for (const invalid of [
+  {...action,cultivar:{name:' e\u0301TOILE\tde CHINE '}},
+  {...action,patch:{name:' e\u0301TOILE\tde CHINE '}},
+  {...action,cultivar:{name:'   '}},
+  {...action,cultivar:{name:123}},
+  {...action,id:'missing'},
+  ...[undefined,null,42,true,{},['single',null],new Array(1)].map(form=>({...action,patch:{form,notes:'Must not save'}})),
+  ...[undefined,999,10000,'85','1985.0',true,[]].map(registeredYear=>({...action,patch:{registeredYear,notes:'Must not save'}})),
+  {...action,patch:{name:'   ',notes:'Must not save'}}
+ ]) {
+  const proposal=model.propose(invalid);
+  assert.equal(proposal.error,true);
+  assert.deepEqual(plain(proposal.document),original);
+  assert.deepEqual(plain(model.document()),original);
+ }
+ const sameIdentity=model.propose({...action,cultivar:{name:"  NUCCIO'S PEARL  "}});
+ assert.equal(sameIdentity.error,false);
+ assert.equal(sameIdentity.document.albums.find(album=>album.id==='pearl').name,"NUCCIO'S PEARL");
+});
+test('reselecting a catalogue cultivar requires authenticated owner access',()=>{
+ const model=scope.window.CamelliaModel.create(seed());
+ const original=plain(model.document());
+ const action={type:'REASSIGN_CULTIVAR',id:'pearl',cultivar:{name:'Correct cultivar'},patch:{notes:'New notes'}};
+ assert.equal(model.propose(action).error,true);
+ assert.deepEqual(plain(model.document()),original);
+ model.setAuthenticated(true);
+ assert.equal(model.propose(action).error,false);
+ model.setAuthenticated(false);
+ assert.equal(model.propose(action).error,true);
+ assert.deepEqual(plain(model.document()),original);
+});
 test('two batches append to the same cultivar while preserving owner data, photo order and cover',()=>{
  const document=seed();
  Object.assign(document.albums[0],{name:'Étoile   de Chine',display_name:'我的星光 🌸',chinese_name:'中国之星',aliases:['星光','Étoile'],description:'保留描述',summary_zh:'保留摘要',customMetadata:{season:'春 2026'}});

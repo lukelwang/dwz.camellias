@@ -29,6 +29,7 @@
   let catalogueCount = 0;
   let catalogueMatches = [];
   let catalogueActive = -1;
+  let editCatalogue = { selected: null, matches: [], active: -1, generation: 0, ready: false };
   let toastTimer;
   let saving = false;
   let loading = false;
@@ -95,6 +96,11 @@
   const checkedForms = field => [...field.querySelectorAll('input:checked')].map(input => input.value);
   const editorValue = input => input.hasAttribute('data-multi-field') ? checkedForms(input) : (input.type === 'checkbox' ? input.checked : input.value);
   const sameEditorValue = (a, b) => Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every(value => b.includes(value)) : a === b;
+  function setEditorValue(input, value) {
+    if (input.hasAttribute('data-multi-field')) input.querySelectorAll('input').forEach(option => { option.checked = value.includes(option.value); });
+    else if (input.type === 'checkbox') input.checked = value;
+    else input.value = value;
+  }
   function refreshEditor(id, preserveDraft = false) {
     const fields = editorFields[id];
     let record;
@@ -110,11 +116,7 @@
       const input = $('#' + inputId);
       const latest = input.hasAttribute('data-multi-field') ? flowerForms(record[field]) : (input.type === 'checkbox' ? record[field] !== false : String(record[field] ?? ''));
       const changed = preserveDraft && previous && !sameEditorValue(editorValue(input), previous[inputId]);
-      if (!changed) {
-        if (input.hasAttribute('data-multi-field')) input.querySelectorAll('input').forEach(option => { option.checked = latest.includes(option.value); });
-        else if (input.type === 'checkbox') input.checked = latest;
-        else input.value = latest;
-      }
+      if (!changed) setEditorValue(input, latest);
       baseline[inputId] = changed ? latest : editorValue(input);
     });
     editorBaselines.set(id, baseline);
@@ -127,7 +129,7 @@
   function updateEditorDirty(id) {
     const baseline = editorBaselines.get(id);
     if (!baseline) return;
-    if (Object.keys(editorFields[id]).some(inputId => !sameEditorValue(editorValue($('#' + inputId)), baseline[inputId]))) dirtyDialogs.add(id);
+    if ((id === 'albumEditDialog' && editCatalogue.selected) || Object.keys(editorFields[id]).some(inputId => !sameEditorValue(editorValue($('#' + inputId)), baseline[inputId]))) dirtyDialogs.add(id);
     else dirtyDialogs.delete(id);
   }
   function refreshOpenEditors() {
@@ -668,9 +670,80 @@
     $('#editingAlbumId').value = id;
     $('#editAlbumAddPhotos').dataset.addTo = id;
     $('#editAlbumReload').dataset.reloadCultivar = id;
+    resetEditCatalogue();
     refreshEditor('albumEditDialog');
     $('#albumEditError').textContent = '';
     openDialog('albumEditDialog');
+  }
+  function hideEditMatches() {
+    $('#editCultivarResults').hidden = true;
+    $('#editCultivarSearch').setAttribute('aria-expanded', 'false');
+    $('#editCultivarSearch').removeAttribute('aria-activedescendant');
+    editCatalogue.active = -1;
+  }
+  function resetEditCatalogue() {
+    editCatalogue = { selected: null, matches: [], active: -1, generation: editCatalogue.generation + 1, ready: false };
+    $('#editCultivarPicker').open = false;
+    $('#editCultivarSearch').value = '';
+    $('#editCultivarStatus').textContent = '';
+    $('#editCultivarSearch').setAttribute('aria-busy', 'false');
+    $('#editAlbumReload').disabled = false;
+    hideEditMatches();
+  }
+  async function loadEditCatalogue() {
+    const generation = ++editCatalogue.generation;
+    editCatalogue.ready = false;
+    editCatalogue.matches = [];
+    hideEditMatches();
+    $('#editCultivarStatus').textContent = 'Connecting to the cultivar catalogue…';
+    $('#editCultivarSearch').setAttribute('aria-busy', 'true');
+    try {
+      await window.CamelliaCatalog.loadIndex({ refresh: true });
+      if (generation !== editCatalogue.generation || !$('#albumEditDialog').open) return;
+      editCatalogue.ready = true;
+      $('#editCultivarStatus').textContent = 'Search English or Chinese names and aliases. Your photos stay in this album.';
+      renderEditMatches();
+    } catch (error) {
+      if (generation === editCatalogue.generation) $('#editCultivarStatus').textContent = error.message || 'Could not load the catalogue. Close and reopen this search to retry.';
+    } finally {
+      if (generation === editCatalogue.generation) $('#editCultivarSearch').setAttribute('aria-busy', 'false');
+    }
+  }
+  function renderEditMatches() {
+    if (!editCatalogue.ready || !$('#editCultivarSearch').value.trim()) { hideEditMatches(); return; }
+    editCatalogue.matches = window.CamelliaCatalog.search($('#editCultivarSearch').value, { limit: 30 }).results;
+    editCatalogue.active = -1;
+    $('#editCultivarResults').innerHTML = editCatalogue.matches.length ? editCatalogue.matches.map((item, index) => `<button type="button" role="option" id="edit-catalog-option-${index}" class="cultivar-option" data-edit-catalog-name="${esc(item.name)}" aria-selected="false" tabindex="-1"><span class="option-name">${esc(item.name)}</span><span class="option-species">${esc(categories[item.species] || item.species || 'Uncategorized')}</span>${[...(item.chinese_name || []), ...(item.japanese_name || [])].length ? `<span class="option-aliases">${esc([...(item.chinese_name || []), ...(item.japanese_name || [])].join(' / '))}</span>` : ''}</button>`).join('') : '<div class="cultivar-no-results">No cultivar found. Try another name or alias.</div>';
+    $('#editCultivarResults').hidden = false;
+    $('#editCultivarSearch').setAttribute('aria-expanded', 'true');
+    $('#editCultivarSearch').removeAttribute('aria-activedescendant');
+  }
+  async function chooseEditCultivar(name) {
+    if (!requireAdmin()) return;
+    const id = $('#editingAlbumId').value;
+    const existing = existingAlbum({ name });
+    if (existing && existing.id !== id) { $('#editCultivarStatus').textContent = 'This cultivar already has another album. Choose a different entry. No photos have been moved.'; return; }
+    const generation = editCatalogue.generation;
+    loading = true; lockUI(); hideEditMatches();
+    $('#editCultivarStatus').textContent = 'Loading the selected cultivar…';
+    try {
+      const cultivar = window.CamelliaCatalog.toCultivar(await window.CamelliaCatalog.getEntry(name));
+      if (generation !== editCatalogue.generation || !$('#albumEditDialog').open) return;
+      editCatalogue.selected = cultivar;
+      Object.entries(editorFields.albumEditDialog).forEach(([inputId, field]) => {
+        if (field === 'notes' || ((field === 'color' || field === 'form') && !cultivar[field]?.length)) return;
+        const value = field === 'form' ? flowerForms(cultivar[field]) : String(cultivar[field] ?? '');
+        setEditorValue($('#' + inputId), value);
+      });
+      $('#editCultivarSearch').value = cultivar.name;
+      $('#editAlbumReload').disabled = true;
+      $('#editAlbumReload').dataset.lockDisabled = 'true';
+      $('#albumEditError').textContent = '';
+      $('#editCultivarStatus').textContent = `Selected: ${cultivar.name}${chineseAliasText(cultivar) ? ' · ' + chineseAliasText(cultivar) : ''}. Review the details below, then save album changes.`;
+      updateEditorDirty('albumEditDialog');
+    } catch (error) {
+      if (generation === editCatalogue.generation) $('#editCultivarStatus').textContent = error.message || 'Could not load this cultivar. Choose the result again to retry.';
+    } finally { loading = false; lockUI(); }
   }
   async function reloadCultivar(id) {
     if (!requireAdmin()) return;
@@ -745,6 +818,7 @@
     if (button.dataset.open) { openAlbum(button.dataset.open); return; }
     if (button.dataset.editAlbum) { openAlbumEdit(button.dataset.editAlbum); return; }
     if (button.dataset.reloadCultivar) { reloadCultivar(button.dataset.reloadCultivar); return; }
+    if (button.dataset.editCatalogName) { chooseEditCultivar(button.dataset.editCatalogName); return; }
     if (button.dataset.deleteAlbum) { deleteAlbum(button.dataset.deleteAlbum); return; }
     if (button.dataset.addTo) { openUpload(button.dataset.addTo); return; }
     if (button.matches('.add-photo,#mobileAddPhoto')) { openUpload(); return; }
@@ -790,10 +864,36 @@
       button.setAttribute('aria-expanded', !expanded); $('#moreFilters').hidden = expanded;
     }
   });
-  if (isManagerPage) document.addEventListener('click', event => { if (!event.target.closest('.cultivar-picker')) hideMatches(); });
+  if (isManagerPage) document.addEventListener('click', event => {
+    if (!event.target.closest('.cultivar-picker')) hideMatches();
+    if (!event.target.closest('#editCultivarPicker')) hideEditMatches();
+  });
   $('#search').addEventListener('input', renderGallery);
   ['colorFilter', 'formFilter', 'sort'].forEach(id => $('#' + id).addEventListener('change', renderGallery));
   if (isManagerPage) {
+    $('#editCultivarPicker').addEventListener('toggle', () => { if ($('#editCultivarPicker').open) loadEditCatalogue(); else hideEditMatches(); });
+    $('#editCultivarSearch').addEventListener('input', renderEditMatches);
+    $('#editCultivarSearch').addEventListener('focus', renderEditMatches);
+    $('#editCultivarSearch').addEventListener('keydown', event => {
+      if (event.isComposing) return;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if ($('#editCultivarResults').hidden) renderEditMatches();
+        if (!editCatalogue.matches.length) return;
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        editCatalogue.active = editCatalogue.active < 0 ? (step > 0 ? 0 : editCatalogue.matches.length - 1) : (editCatalogue.active + step + editCatalogue.matches.length) % editCatalogue.matches.length;
+        $$('#editCultivarResults .cultivar-option').forEach((option, index) => option.setAttribute('aria-selected', index === editCatalogue.active));
+        const active = $('#edit-catalog-option-' + editCatalogue.active);
+        $('#editCultivarSearch').setAttribute('aria-activedescendant', active.id);
+        active.scrollIntoView({ block: 'nearest' });
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        const item = editCatalogue.matches[editCatalogue.active] || (editCatalogue.matches.length === 1 ? editCatalogue.matches[0] : null);
+        if (!$('#editCultivarResults').hidden && item) chooseEditCultivar(item.name);
+      } else if (event.key === 'Escape' && !$('#editCultivarResults').hidden) { event.preventDefault(); event.stopPropagation(); hideEditMatches(); }
+      else if (event.key === 'Tab') hideEditMatches();
+    });
+    $('#editCultivarResults').addEventListener('mousedown', event => event.preventDefault());
     $('#cultivarSearch').addEventListener('input', () => {
       selectionGeneration++; setSelected(null); $('#clearCultivar').hidden = !$('#cultivarSearch').value; renderMatches();
     });
@@ -848,9 +948,11 @@
     $('#albumEditForm').addEventListener('submit', async event => {
       event.preventDefault(); if (!requireAdmin()) return;
       const patch = editorPatch('albumEditDialog');
-      if (!Object.keys(patch).length) { closeDialog('albumEditDialog'); toast('No album changes to save.'); return; }
+      if (!Object.keys(patch).length && !editCatalogue.selected) { closeDialog('albumEditDialog'); toast('No album changes to save.'); return; }
       if (Object.hasOwn(patch, 'description')) patch.summary_zh = patch.description;
-      const next = await saveAction({ type: 'PATCH_ALBUM', id: $('#editingAlbumId').value, patch }, {}, '#albumEditError');
+      const action = { type: editCatalogue.selected ? 'REASSIGN_CULTIVAR' : 'PATCH_ALBUM', id: $('#editingAlbumId').value, patch };
+      if (editCatalogue.selected) action.cultivar = editCatalogue.selected;
+      const next = await saveAction(action, { message: editCatalogue.selected ? 'Correct cultivar selection' : 'Update cultivar album' }, '#albumEditError');
       if (next) { dirtyDialogs.delete('albumEditDialog'); closeDialog('albumEditDialog'); }
     });
     $('#photoEditForm').addEventListener('submit', async event => {
@@ -906,6 +1008,7 @@
       dialogOpeners.delete(dialog.id);
       if (dialog.id === 'uploadDialog') { clearPending(); $('#photoFiles').disabled = false; }
       if (dialog.id === 'loginDialog') $('#githubToken').value = '';
+      if (dialog.id === 'albumEditDialog') resetEditCatalogue();
       if (dialog.id === 'albumDialog') closeDialog('lightbox');
       if (opener) restoreFocus(opener.focus, opener.root, $('#emptyReset').hidden ? $('#search') : $('#emptyReset'));
     });

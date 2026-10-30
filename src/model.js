@@ -10,7 +10,7 @@
   const ALBUM_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'notes', 'registeredYear'];
   const CATALOGUE_FIELDS = ['name', 'display_name', 'description', 'summary_zh', 'species', 'color', 'form', 'size', 'chinese_name', 'japanese_name', 'reference_url', 'catalogue'];
   const PHOTO_FIELDS = ['caption', 'takenAt', 'dateSource', 'dateOffset'];
-  const ADMIN_ACTIONS = ['ADD_PHOTOS', 'REFRESH_CULTIVAR', 'PATCH_ALBUM', 'PATCH_PHOTO', 'DELETE_PHOTO', 'DELETE_ALBUM', 'SET_COVER', 'MOVE_PHOTO', 'PATCH_SETTINGS'];
+  const ADMIN_ACTIONS = ['ADD_PHOTOS', 'REFRESH_CULTIVAR', 'REASSIGN_CULTIVAR', 'PATCH_ALBUM', 'PATCH_PHOTO', 'DELETE_PHOTO', 'DELETE_ALBUM', 'SET_COVER', 'MOVE_PHOTO', 'PATCH_SETTINGS'];
   const select = (object, fields) => Object.fromEntries(fields.filter(key => Object.hasOwn(object, key)).map(key => [key, object[key]]));
   const sourceURL = name => 'https://camellia-nomenclature.github.io/#' + encodeURIComponent(name);
   const canonicalName = name => typeof name === 'string' ? name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase() : '';
@@ -95,6 +95,27 @@
       return finish({ albums: state.albums.map(item => item.id === id ? transform(item) : item) }, message);
     }
 
+    function validateAlbumPatch(patch, id) {
+      if (Object.hasOwn(patch, 'form')) {
+        if (!validFlowerForms(patch.form)) return 'Flower forms must be a name or a list of names.';
+        patch.form = flowerForms(patch.form);
+      }
+      if (Object.hasOwn(patch, 'registeredYear')) {
+        const value = patch.registeredYear;
+        patch.registeredYear = registrationYear(value);
+        if (patch.registeredYear === null && value !== null && !(typeof value === 'string' && !value.trim())) {
+          return 'Registration year must be a four-digit year from 1000 to 9999, or blank.';
+        }
+      }
+      if (Object.hasOwn(patch, 'name')) {
+        patch.name = String(patch.name || '').trim();
+        if (!patch.name) return 'Cultivar name cannot be empty.';
+        if (state.albums.some(album => album.id !== id && canonicalName(album.name) === canonicalName(patch.name))) return 'A cultivar with this name already exists. Choose a different name.';
+        patch.reference_url = sourceURL(patch.name);
+      }
+      return '';
+    }
+
     function dispatch(action) {
       const type = action.type;
       if (ADMIN_ACTIONS.includes(type) && state.role !== 'admin') {
@@ -133,7 +154,7 @@
         const updated = { ...album, photos: [...album.photos, ...photos], coverPhotoId: album.coverPhotoId || photos[0].id };
         return finish({ albums: existing ? state.albums.map(item => item.id === album.id ? updated : item) : [...state.albums, updated] }, `Added ${photos.length} photo${photos.length === 1 ? '' : 's'} to “${album.display_name || album.name}”.`);
       }
-      if (type === 'REFRESH_CULTIVAR') {
+      if (type === 'REFRESH_CULTIVAR' || type === 'REASSIGN_CULTIVAR') {
         const cultivar = action.cultivar || {};
         const patch = select(cultivar, CATALOGUE_FIELDS);
         if (typeof patch.color !== 'string' || !patch.color.trim()) delete patch.color;
@@ -144,28 +165,19 @@
         if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
         if (state.albums.some(album => album.id !== action.id && canonicalName(album.name) === canonicalName(patch.name))) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
         const year = registrationYear(cultivar.registeredYear);
-        if (year !== null) patch.registeredYear = year;
+        if (year !== null || type === 'REASSIGN_CULTIVAR') patch.registeredYear = year;
+        if (type === 'REASSIGN_CULTIVAR') {
+          const edits = select(action.patch || {}, ALBUM_FIELDS);
+          const error = validateAlbumPatch(edits, action.id);
+          if (error) return finish({}, error, true);
+          return updateAlbum(action.id, album => ({ ...album, ...patch, ...edits }), 'Cultivar selection updated.');
+        }
         return updateAlbum(action.id, album => ({ ...album, ...patch }), 'Cultivar details reloaded from the catalogue.');
       }
       if (type === 'PATCH_ALBUM') {
         const patch = select(action.patch || {}, ALBUM_FIELDS);
-        if (Object.hasOwn(patch, 'form')) {
-          if (!validFlowerForms(patch.form)) return finish({}, 'Flower forms must be a name or a list of names.', true);
-          patch.form = flowerForms(patch.form);
-        }
-        if (Object.hasOwn(patch, 'registeredYear')) {
-          const value = patch.registeredYear;
-          patch.registeredYear = registrationYear(value);
-          if (patch.registeredYear === null && value !== null && !(typeof value === 'string' && !value.trim())) {
-            return finish({}, 'Registration year must be a four-digit year from 1000 to 9999, or blank.', true);
-          }
-        }
-        if (Object.hasOwn(patch, 'name')) {
-          patch.name = String(patch.name || '').trim();
-          if (!patch.name) return finish({}, 'Cultivar name cannot be empty.', true);
-          if (state.albums.some(album => album.id !== action.id && canonicalName(album.name) === canonicalName(patch.name))) return finish({}, 'A cultivar with this name already exists. Choose a different name.', true);
-          patch.reference_url = sourceURL(patch.name);
-        }
+        const error = validateAlbumPatch(patch, action.id);
+        if (error) return finish({}, error, true);
         return updateAlbum(action.id, album => ({ ...album, ...patch }), 'Cultivar details updated.');
       }
       if (type === 'DELETE_ALBUM') {
