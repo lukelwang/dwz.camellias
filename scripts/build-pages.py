@@ -10,6 +10,7 @@ if not re.fullmatch(r'studio-[a-f0-9]{12}\.html',args.manager_output):
  parser.error('Use a studio-<12 hex characters>.html filename.')
 template=(root/'templates/gallery.html.template').read_text()
 public=re.sub(r'<!-- OWNER_START -->.*?<!-- OWNER_END -->','',template,flags=re.S)
+public=public.replace('<option value="newly-added">','<option value="newly-added" selected>')
 manager=template.replace('<!-- OWNER_START -->','').replace('<!-- OWNER_END -->','')
 manager=manager.replace('<meta name="referrer"','<meta name="robots" content="noindex, nofollow, nosnippet">\n  <meta name="referrer"',1)
 def clean(value):

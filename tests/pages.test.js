@@ -22,6 +22,14 @@ test('separate owner page keeps authentication and multi-photo controls and requ
  assert.match(managerHTML,/id="photoFiles"[^>]*multiple/);
  assert.match(managerHTML,/href="\.\/"[^>]*>View public gallery/);
 });
+test('the public gallery defaults to newly added while the owner page keeps random order',()=>{
+ const publicSort=publicHTML.match(/<select id="sort">(.*?)<\/select>/s)[1];
+ assert.match(publicSort,/<option value="newly-added" selected>/);
+ const managerHTML=fs.readFileSync(path.join(root,managerFiles[0]),'utf8');
+ const managerSort=managerHTML.match(/<select id="sort">(.*?)<\/select>/s)[1];
+ assert.match(managerSort,/^<option value="curated">/);
+ assert.doesNotMatch(managerSort,/\sselected[\s>]/);
+});
 test('both documents and fixed application messages use English',()=>{
  for(const name of ['index.html',...managerFiles]){
   const html=fs.readFileSync(path.join(root,name),'utf8');

@@ -32,6 +32,33 @@ test('record links default to visible and the owner can persist visibility witho
  assert.equal(model.getState().settings.showCultivarRecordLinks,false);
  assert.deepEqual(plain(model.document().albums),original);
 });
+test('setting a cover moves that photo first while keeping all other photos and metadata until save',()=>{
+ const document=seed();
+ Object.assign(document.albums[0],{addedAt:'2025-03-01T12:00:00.000Z',customMetadata:{location:'Garden'}});
+ document.albums[0].photos.push({id:'three',caption:'Third flower',takenAt:'2026-10-30T09:26',customMetadata:{camera:'Phone'}},{id:'four',caption:'Fourth flower'});
+ const model=scope.window.CamelliaModel.create(document);
+ const before=plain(model.document());
+ assert.equal(model.propose({type:'SET_COVER',albumId:'pearl',photoId:'three'}).error,true);
+ model.setAuthenticated(true);
+ const proposal=model.propose({type:'SET_COVER',albumId:'pearl',photoId:'three'});
+ assert.equal(proposal.error,false);
+ const album=plain(proposal.document.albums[0]);
+ assert.deepEqual(album,{...before.albums[0],coverPhotoId:'three',photos:[before.albums[0].photos[2],before.albums[0].photos[0],before.albums[0].photos[1],before.albums[0].photos[3]]});
+ assert.deepEqual(plain(model.document()),before);
+ model.accept(proposal.document);
+ assert.deepEqual(plain(model.document().albums[0]),album);
+});
+test('an existing cover can move first and choosing it again does not duplicate photos',()=>{
+ const document=seed();document.albums[0].coverPhotoId='two';
+ const model=scope.window.CamelliaModel.create(document);model.setAuthenticated(true);
+ for(let attempt=0;attempt<2;attempt++){
+  const proposal=model.propose({type:'SET_COVER',albumId:'pearl',photoId:'two'});
+  assert.equal(proposal.error,false);
+  assert.deepEqual(plain(proposal.document.albums[0].photos.map(photo=>photo.id)),['two','one']);
+  assert.equal(proposal.document.albums[0].coverPhotoId,'two');
+  model.accept(proposal.document);
+ }
+});
 test('adding a batch preserves owner metadata and deletion updates the cover only on accept',()=>{
  const model=scope.window.CamelliaModel.create(seed());model.setAuthenticated(true);
  const added=model.propose({type:'ADD_PHOTOS',cultivar:{id:'pearl',name:"Nuccio's Pearl",display_name:'源网站名称',notes:'源网站备注'},photos:[{id:'three',caption:'新花',frame:null}]});

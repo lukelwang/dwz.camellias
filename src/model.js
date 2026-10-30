@@ -202,7 +202,7 @@
             return { ...item, photos, coverPhotoId: item.coverPhotoId === photo.id ? (photos[0]?.id || null) : item.coverPhotoId };
           }, 'Photo deleted. The cultivar album remains.');
         }
-        if (type === 'SET_COVER') return updateAlbum(album.id, item => ({ ...item, coverPhotoId: photo.id }), 'Set as album cover.');
+        if (type === 'SET_COVER') return updateAlbum(album.id, item => ({ ...item, coverPhotoId: photo.id, photos: [photo, ...item.photos.filter(item => item.id !== photo.id)] }), 'Set as album cover.');
         if (action.direction !== -1 && action.direction !== 1) return finish({}, 'Choose whether to move the photo forward or backward.', true);
         const index = album.photos.indexOf(photo);
         const target = index + action.direction;
