@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const raw={name:'Secchū-no-ka',species:'NRH',chinese_name:['雪中花'],japanese_name:[],size:'Large',description:'A fragrant camellia hybrid.'};
-function catalogue(){
- const scope={window:{},TextEncoder,AbortController,setTimeout,clearTimeout,fetch:async url=>({ok:true,json:async()=>url.endsWith('data/index.json')?[raw]:{[raw.name]:raw}})};
+function catalogue(fetchImpl=async url=>({ok:true,json:async()=>url.endsWith('data/index.json')?[raw]:{[raw.name]:raw}}),abortSignal=AbortSignal){
+ const scope={window:{},TextEncoder,AbortSignal:abortSignal,fetch:fetchImpl};
  vm.runInNewContext(fs.readFileSync(require.resolve('../catalog.js'),'utf8'),scope);
  return scope.window.CamelliaCatalog;
 }
@@ -45,11 +45,39 @@ test('publication and originated years in prose do not become a registration yea
 });
 test('explicit registration metadata survives live index and detail normalization',async()=>{
  const record={...raw,registration_year:'1986'};
- const scope={window:{},TextEncoder,AbortController,setTimeout,clearTimeout,fetch:async url=>({ok:true,json:async()=>url.endsWith('data/index.json')?[record]:{[record.name]:record}})};
+ const scope={window:{},TextEncoder,AbortSignal,fetch:async url=>({ok:true,json:async()=>url.endsWith('data/index.json')?[record]:{[record.name]:record}})};
  vm.runInNewContext(fs.readFileSync(require.resolve('../catalog.js'),'utf8'),scope);
  const catalog=scope.window.CamelliaCatalog;
  await catalog.loadIndex();
  const result=catalog.search('雪中花').results[0];
  assert.equal(result.registeredYear,1986);
  assert.equal(catalog.toCultivar(await catalog.getEntry(result.name)).registeredYear,1986);
+});
+
+
+test('catalogue requests use a 15-second AbortSignal timeout and keep the timeout message',async()=>{
+ let requestedTimeout;
+ let signal;
+ const catalog=catalogue(async(url,options)=>{
+  signal=options.signal;
+  signal.aborted=true;
+  throw new DOMException('deadline elapsed','TimeoutError');
+ },{timeout(milliseconds){requestedTimeout=milliseconds;return {aborted:false};}});
+ await assert.rejects(catalog.loadIndex(),error=>{
+  assert.match(error.message,/request timed out/i);
+  assert.equal(error.cause.name,'TimeoutError');
+  return true;
+ });
+ assert.equal(requestedTimeout,15000);
+ assert.equal(signal.aborted,true);
+});
+
+test('catalogue network failures retain the original error as cause',async()=>{
+ const failure=new TypeError('connection reset');
+ const catalog=catalogue(async()=>{throw failure;});
+ await assert.rejects(catalog.loadIndex(),error=>{
+  assert.match(error.message,/connection reset/);
+  assert.equal(error.cause,failure);
+  return true;
+ });
 });
