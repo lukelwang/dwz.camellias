@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#101310">
   <meta name="description" content="A personal camellia garden. Discover the cultivars and photographs behind every bloom.">
   <title>DWZ Camellias · A personal camellia garden</title>
+  <link rel="preconnect" href="https://api.github.com" crossorigin>
+  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="catalogue-picker.css">

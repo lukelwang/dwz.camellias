@@ -48,17 +48,14 @@
   }
 
   async function fetchJSON(path) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const signal = AbortSignal.timeout(15000);
     try {
-      const response = await fetch(SOURCE + path, { cache: 'no-store', signal: controller.signal });
+      const response = await fetch(SOURCE + path, { cache: 'no-store', signal });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return await response.json();
     } catch (error) {
-      const reason = controller.signal.aborted ? 'The request timed out' : (error.message || 'Network error');
-      throw new Error('Unable to load the live camellia catalogue. ' + reason + '. Please retry.');
-    } finally {
-      clearTimeout(timeout);
+      const reason = signal.aborted ? 'The request timed out' : (error.message || 'Network error');
+      throw new Error('Unable to load the live camellia catalogue. ' + reason + '. Please retry.', { cause: error });
     }
   }
 
