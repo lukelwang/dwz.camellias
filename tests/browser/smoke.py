@@ -259,35 +259,36 @@ HERO_BOXES = """() => { const hero = document.querySelector('.hero').getBounding
 LONG_WATERMARK = ('© ' + 'A very long garden watermark entered by the owner ' * 3)[:100]  # the settings field allows 100 characters
 
 def watermark_problems(page, label):
-    """Returns the problems with the hero watermark in the current hero layout (empty when it is visible, inside the hero and clear)."""
+    """Returns (data, [(tag, detail)]) for the hero watermark in the current layout; empty when it is visible, inside the hero and clear."""
     data = page.evaluate(HERO_BOXES); mark, hero = data['mark'], data['hero']
     check(data['others'], f'hero text and controls found ({label})')
     if not (mark and mark['visible'] and mark['r'] - mark['x'] > 0 and mark['b'] - mark['y'] > 0):
-        return data, [f'hero watermark is not visible ({label})']
+        return data, [('hidden', f'hero watermark is not visible ({label})')]
     problems = []
     if not (mark['x'] >= hero['x'] and mark['r'] <= hero['r'] and mark['y'] >= hero['y'] and mark['b'] <= hero['b']):
-        problems.append(f'hero watermark lies outside the hero ({label})')
+        problems.append(('outside', f'hero watermark lies outside the hero ({label})'))
     hits = [o['name'] for o in data['others'] if o['x'] < mark['r'] and mark['x'] < o['r'] and o['y'] < mark['b'] and mark['y'] < o['b']]
     if hits:
-        problems.append(f'hero watermark overlaps hero text or controls ({label}): {hits}')
+        problems.append(('overlap', f'hero watermark overlaps hero text or controls ({label}): {hits}'))
     return data, problems
 
-HIT_EXTENT = """() => { const link = document.querySelector('.hero-link'); const r = link.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2, step = 0.25;
-    const hit = (x, y) => !!document.elementFromPoint(x, y)?.closest('.hero-link');
-    // Span between the outermost hitting probes; edge hits round to the pixel grid, so this reads up to 0.5px above the true size.
-    const extent = (fn) => { let lo = 0, hi = 0; while (lo > -80 && fn(lo - step)) lo -= step; while (hi < 80 && fn(hi + step)) hi += step; return hi - lo; };
-    return {height: extent(d => hit(cx, cy + d)), width: extent(d => hit(cx + d, cy)), step}; }"""
+HIT_TARGET = """() => { const link = document.querySelector('.hero-link'); const r = link.getBoundingClientRect(); const before = getComputedStyle(link, '::before');
+    const extends_ = before.content !== 'none' && before.position === 'absolute';  // the ::before overlay enlarges the hit area around the link box
+    const inset = extends_ ? Math.abs(parseFloat(before.top) || 0) : 0;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2, hit = (x, y) => !!document.elementFromPoint(x, y)?.closest('.hero-link');
+    return {boxHeight: r.height, boxWidth: r.width, beforeTopInset: inset, height: r.height + 2 * inset, width: r.width,
+            insideHits: {up: hit(cx, cy - 21.5), down: hit(cx, cy + 21.5), left: hit(cx - 21.5, cy), right: hit(cx + 21.5, cy)}}; }"""
 
 def flow_hero(context, vp):
     """At every hero layout the watermark is visible, inside the hero and clear of all hero text and controls (also when the owner
     sets a 100-character watermark); on phones the "Explore the garden" hit area is at least 44x44."""
     page, doc, errors = open_page(context)
     page.wait_for_function("() => { const i = document.querySelector('.hero-art img'); return i && i.complete && document.querySelector('.hero-art > .photo-watermark'); }")
-    problems, seen = [], set()
+    problems, seen = [], set()  # (tag, detail)
     for sample in range(HERO_SAMPLES):  # the featured cultivar changes on each hero activation; the watermark must clear every layout
         data, found = watermark_problems(page, f'{vp}, {page.get_attribute(".hero-art", "aria-label")}'); seen.add(data['featured'])
         if found:
-            problems += found; break
+            problems += [('default-' + tag, detail) for tag, detail in found]; break
         if sample < HERO_SAMPLES - 1 and page.is_enabled('.hero-art'):
             page.focus('.hero-art'); page.keyboard.press('Enter')
             page.wait_for_function("(label) => document.querySelector('.hero-art').getAttribute('aria-label') !== label && document.querySelector('.hero-art img').complete", arg=data['featured'])
@@ -297,15 +298,19 @@ def flow_hero(context, vp):
     short_height = page.evaluate("() => document.querySelector('.hero-art > .photo-watermark').getBoundingClientRect().height")
     page.evaluate("text => document.querySelectorAll('.photo-watermark').forEach(el => { el.textContent = text; })", LONG_WATERMARK)
     data, found = watermark_problems(page, f'{vp}, {len(LONG_WATERMARK)}-character watermark')
-    problems += found
+    problems += [('long-' + tag, detail) for tag, detail in found]
     if not found and data['mark']['b'] - data['mark']['y'] > short_height + 0.5:
-        problems.append(f'{len(LONG_WATERMARK)}-character watermark wraps ({data["mark"]["b"] - data["mark"]["y"]:.1f}px tall, one line is {short_height:.1f}px)')
+        problems.append(('long-wrap', f'{len(LONG_WATERMARK)}-character watermark wraps ({data["mark"]["b"] - data["mark"]["y"]:.1f}px tall, one line is {short_height:.1f}px)'))
     if vp in ('320', '390'):
         page.locator('.hero-link').scroll_into_view_if_needed()
-        target = page.evaluate(HIT_EXTENT)
+        target = page.evaluate(HIT_TARGET)  # geometry is the threshold; probes 21.5px from the centre only confirm hit testing inside it
         if target['height'] < 44 or target['width'] < 44:
-            problems.append(f'"Explore the garden" hit area is under 44x44: {target}')
-    check(not problems, f'hero ({vp}): ' + ' | '.join(problems))
+            problems.append(('hit-area', f'"Explore the garden" hit area is under 44x44: {target}'))
+        elif not all(target['insideHits'].values()):
+            problems.append(('hit-probe', f'"Explore the garden" does not receive taps inside its 44x44 area: {target}'))
+    if problems:
+        count = f'{len(problems)} problem' + ('' if len(problems) == 1 else 's')
+        raise Failure('\n'.join([f'hero ({vp}): {count} [{", ".join(tag for tag, _ in problems)}]'] + [f'{tag}: {detail}' for tag, detail in problems]))
     finish(page, errors)
 
 def flow_owner_gate(context, vp):
@@ -329,15 +334,16 @@ def main():
         for vp, flow in PLAN:
             context = contexts.get(vp) or contexts.setdefault(vp, new_context(browser, vp))
             name = f'{flow.__name__[5:]}@{vp}'
-            failed, message = False, ''
+            failed, lines = False, []
             try:
                 flow(context, vp)
             except Exception as error:  # report and continue with the next flow
                 failed = True
-                lines = [line for line in redact(error).splitlines() if line.strip()]  # redact before truncating
-                message = (lines or [type(error).__name__])[0][:300]
+                lines = [line[:300] for line in redact(error).splitlines() if line.strip()] or [type(error).__name__]  # redact before truncating
             results.append((name, failed))
-            print(f'  FAIL {name}: {message}' if failed else f'  ok   {name}')
+            print(f'  FAIL {name}: {lines[0]}' if failed else f'  ok   {name}')
+            for line in lines[1:]:
+                print(f'         {line}')
             for page in context.pages: page.close()
         browser.close()
     failed = [name for name, bad in results if bad]
