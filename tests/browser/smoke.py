@@ -64,10 +64,15 @@ VIEWPORTS = {
 INIT = """window.__csp = [];
 document.addEventListener('securitypolicyviolation', e => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
 // Cold-load record: header top on every animation frame and every #resultSummary text, each with the card count at that moment.
-window.__load = {tops: [], summary: []};
+// Sampling stops a settle window after the load completes (cards rendered, or the empty/error state shown once the page is no longer busy),
+// with a 30s hard cap so a slow load cannot end the record early.
+window.__load = {tops: [], summary: [], completedFrame: null};
 (() => { const start = performance.now(), cards = () => document.querySelectorAll('#gallery .cultivar-card').length;
+  const complete = () => document.body?.getAttribute('aria-busy') === 'false' && (cards() > 0 || document.querySelector('#emptyState')?.hidden === false);
   const tick = () => { const header = document.querySelector('.site-header'); if (header) __load.tops.push([Math.round(header.getBoundingClientRect().top * 100) / 100, cards()]);
-    if (performance.now() - start < 8000) requestAnimationFrame(tick); };
+    if (__load.completedFrame === null && complete()) __load.completedFrame = __load.tops.length;
+    const settled = __load.completedFrame !== null && __load.tops.length - __load.completedFrame >= 30;
+    if (!settled && performance.now() - start < 30000) requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   const note = () => { const summary = document.querySelector('#resultSummary'); if (summary) __load.summary.push([summary.textContent, cards()]); };
   document.addEventListener('DOMContentLoaded', () => { note(); const summary = document.querySelector('#resultSummary');
@@ -110,8 +115,8 @@ def new_context(browser, viewport):
 def open_page(context, path=''):
     """Fresh page; returns (page, gallery document, page errors list)."""
     page = context.new_page(); errors = []
-    page.on('pageerror', lambda e: errors.append('pageerror: ' + str(e)[:200]))
-    page.on('console', lambda m: m.type == 'error' and errors.append('console: ' + m.text[:200]))
+    page.on('pageerror', lambda e: errors.append('pageerror: ' + redact(e)[:200]))  # redact before slicing
+    page.on('console', lambda m: m.type == 'error' and errors.append('console: ' + redact(m.text)[:200]))
     with page.expect_response(lambda r: r.url.endswith('/gallery.json'), timeout=30000) as info:
         page.goto(BASE_URL + path, wait_until='domcontentloaded')
     response = info.value
@@ -178,8 +183,9 @@ def flow_load(context, vp):
 def flow_load_failure(context, vp):
     """The latest-commit lookup answers 500 (a stubbed GET; this page only): the status banner and "Reload the garden" appear."""
     page = context.new_page(); page_errors = []
-    page.on('pageerror', lambda e: page_errors.append('pageerror: ' + str(e)[:200]))
-    page.route(REF_LOOKUP, lambda route, request: route.fulfill(status=500, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"message":"fixture failure"}'))
+    page.on('pageerror', lambda e: page_errors.append('pageerror: ' + redact(e)[:200]))  # redact before slicing
+    page.route(REF_LOOKUP, lambda route, request: route.fulfill(status=500, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"message":"fixture failure"}')
+               if request.method == 'GET' else route.fallback())  # non-GETs reach route_guard, which blocks and counts them
     page.goto(BASE_URL, wait_until='domcontentloaded')
     page.wait_for_selector('#reloadGallery', state='visible')
     state = page.evaluate("""() => ({banner: !document.querySelector('#storeStatus').hidden && document.querySelector('#storeStatus').getClientRects().length > 0,
