@@ -341,6 +341,10 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
   .header-tools { margin-left: auto; }
   html[data-dark="true"] .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 1024px) {
+  /* Up to 1024px the hero's bottom band holds the cultivar line and arrow; the band above the eyebrow is empty. Keep the mark on one line there. */
+  .hero-art > .photo-watermark { top: 10px; bottom: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 @media (max-width: 768px) {
   .page-width { width: calc(100% - 48px); }
   html[data-dark="true"] .collection { padding-top: 48px; }
@@ -372,8 +376,6 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
       linear-gradient(270deg, #101310a3 0%, #10131000 12%);
   }
   html[data-dark="true"] .hero-art-top { display: none; }
-  /* Phones: the bottom band holds the cultivar line and arrow; the band above the eyebrow is empty. */
-  .hero-art > .photo-watermark { top: 10px; bottom: auto; }
   .hero-link { position: relative; }
   .hero-link::before { content: ""; position: absolute; inset: -9px 0; }
   html[data-dark="true"] .hero h1 { font-size: clamp(40px, 11vw, 49px); line-height: 1.25; }
