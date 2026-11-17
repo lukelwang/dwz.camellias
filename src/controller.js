@@ -39,6 +39,7 @@
   let recoveryRequired = false;
   const dirtyDialogs = new Set();
   const dialogOpeners = new Map();
+  const backdropPresses = new WeakMap();
   const editorBaselines = new Map();
   const editorFields = {
     albumEditDialog: { editDisplayName: 'display_name', editCanonicalName: 'name', editSpecies: 'species', editSize: 'size', editColor: 'color', editForm: 'form', editDescription: 'description', editNotes: 'notes', editRegisteredYear: 'registeredYear' },
@@ -203,7 +204,9 @@
     const generation = sessionGeneration;
     const root = focusRoot();
     const focus = rememberFocus(root);
-    loading = true; galleryLoadError = false; status('Loading the latest garden…'); renderGallery(); lockUI();
+    // The first public load is announced by #resultSummary; an in-flow banner here would push the page down and then collapse.
+    const reload = galleryLoaded || galleryLoadError || isManagerPage;
+    loading = true; galleryLoadError = false; if (reload) status('Loading the latest garden…'); renderGallery(); lockUI();
     try {
       const document = await store.loadPublic();
       if (generation !== sessionGeneration) return;
@@ -228,6 +231,7 @@
     if (dialog && !dialog.open) {
       const root = focusRoot();
       dialogOpeners.set(id, { root, focus: rememberFocus(root) });
+      backdropPresses.delete(dialog);
       dialog.showModal();
     }
   }
@@ -436,7 +440,7 @@
     const index = photos.indexOf(photo);
     const chineseAlias = chineseAliasText(album);
     const aliases = [...new Set(album.japanese_name || [])].filter(name => !(album.chinese_name || []).includes(name) && name !== album.name && name !== album.display_name);
-    $('#albumContent').innerHTML = `<div class="album-toolbar"><span>Cultivar album</span><button class="icon-button album-close" data-close="albumDialog" aria-label="Close cultivar album">${icon('close')}</button></div><div class="album-layout"><div class="album-media"><div id="albumStage" class="album-stage">${photo ? `<button class="photo-zoom" data-zoom aria-label="View photograph fullscreen">${photoMarkup(photo, undefined, 'eager')}</button>${photos.length > 1 ? `<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button>` : ''}<span class="photo-position">${index + 1} / ${photos.length}</span>` : '<div class="album-empty"><p>No photographs yet.</p><p>Add a photograph to remember this cultivar’s first bloom.</p></div>'}</div><div class="album-photo-heading"><span>${countLabel(photos.length, 'photo')}</span>${admin() && photo ? `<button class="secondary-button cover-choice" data-admin data-cover-photo="${esc(photo.id)}" ${album.coverPhotoId === photo.id ? 'disabled' : ''}>${album.coverPhotoId === photo.id ? 'Current cover' : 'Set as cover'}</button>` : ''}</div><div id="albumThumbnails" class="photo-thumbnails">${photos.map(item => `<button data-photo-id="${esc(item.id)}" class="${item.id === photo?.id ? 'active' : ''}" aria-label="${admin() && album.coverPhotoId === item.id ? 'Current cover · ' : ''}View ${esc(item.caption || item.filename || 'photograph')}" aria-pressed="${item.id === photo?.id}">${photoMarkup({ ...item, src: item.thumbnailSrc || item.src }, '')}${admin() && album.coverPhotoId === item.id ? '<span class="cover-badge">Cover</span>' : ''}</button>`).join('')}</div>${photo ? `<p class="photo-caption">${esc(photo.caption || '')}</p><p id="photoCredit" class="photo-credit">${esc(photo.kind === 'personal' ? 'Garden photograph' : 'Reference photograph' + (photo.credit ? ' · © ' + photo.credit : ''))}${displayDate(photo) ? `<br>${esc(displayDate(photo))}` : ''}${photo.source_url ? `<br><a href="${esc(sourceURL(photo.source_url))}" target="_blank" rel="noopener noreferrer">View image source</a>` : ''}</p>` : ''}${admin() && photo ? `<div class="photo-admin" data-admin><button data-edit-photo="${esc(photo.id)}">Edit photo</button><button data-move-photo="${esc(photo.id)}" data-direction="-1" ${album.photos.indexOf(photo) <= 1 ? 'disabled' : ''}>Move earlier</button><button data-move-photo="${esc(photo.id)}" data-direction="1" ${photo.id === album.coverPhotoId || album.photos.indexOf(photo) === album.photos.length - 1 ? 'disabled' : ''}>Move later</button><button data-delete-photo="${esc(photo.id)}">Delete photograph</button></div>` : ''}</div><div class="album-info"><p class="album-category">${esc(categories[album.species] || album.species || 'Uncategorized')}</p><h2>${esc(album.display_name || album.name)}</h2>${chineseAlias ? `<p class="cultivar-alias album-chinese-alias" lang="zh-Hans">${esc(chineseAlias)}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="album-latin">${esc(album.name)}</p>` : ''}${aliases.length ? `<p class="album-aliases">Also known as · ${esc(aliases.join(' / '))}</p>` : ''}<p class="album-description">${esc(album.summary_zh || album.description || 'No cultivar description yet.').replace(/\n/g, '<br>')}</p><dl class="album-facts"><div><dt>Category</dt><dd>${esc(categories[album.species] || album.species || 'Uncategorized')}</dd></div><div><dt>Color</dt><dd>${esc(colors[album.color] || 'See description')}</dd></div><div><dt>Form</dt><dd>${esc(formLabel(album.form) || 'See description')}</dd></div><div><dt>Bloom size</dt><dd>${esc(sizes[album.size] || album.size || 'Not specified')}</dd></div><div><dt>Registered year</dt><dd>${window.CamelliaModel.registrationYear(album.registeredYear) ?? 'Unknown'}</dd></div><div><dt>Added to gallery</dt><dd>${esc(addedDateLabel(album))}</dd></div></dl>${album.notes ? `<div class="album-notes"><h3>Garden notes</h3><p>${esc(album.notes).replace(/\n/g, '<br>')}</p></div>` : ''}${state().settings.showCultivarRecordLinks ? `<a class="source-link" href="${esc(sourceURL(album.reference_url))}" target="_blank" rel="noopener noreferrer">View full cultivar record ${icon('external')}</a>` : ''}<div class="album-photo-tabs" role="group" aria-label="Photo source">${[['all', 'All photos']].map(([kind, label]) => `<button data-photo-filter="${kind}" aria-pressed="${albumView.filter === kind}">${label} ${album.photos.filter(item => kind === 'all' || item.kind === kind).length}</button>`).join('')}</div>${admin() ? `<div class="album-actions"><button class="primary-button" data-add-to="${esc(album.id)}" data-admin>${icon('plus')}Add photos to this cultivar</button><button data-edit-album="${esc(album.id)}" data-admin>Edit cultivar</button><button data-delete-album="${esc(album.id)}" data-admin>Delete album</button></div>` : ''}</div></div>`;
+    $('#albumContent').innerHTML = `<div class="album-toolbar"><span>Cultivar album</span><button class="icon-button album-close" data-close="albumDialog" aria-label="Close cultivar album" autofocus>${icon('close')}</button></div><div class="album-layout"><div class="album-media"><div id="albumStage" class="album-stage">${photo ? `<button class="photo-zoom" data-zoom aria-label="View photograph fullscreen">${photoMarkup(photo, undefined, 'eager')}</button>${photos.length > 1 ? `<button class="photo-arrow prev" data-photo-step="-1" aria-label="Previous photograph">${icon('chevron')}</button><button class="photo-arrow next" data-photo-step="1" aria-label="Next photograph">${icon('chevron')}</button>` : ''}<span class="photo-position">${index + 1} / ${photos.length}</span>` : '<div class="album-empty"><p>No photographs yet.</p><p>Add a photograph to remember this cultivar’s first bloom.</p></div>'}</div><div class="album-photo-heading"><span>${countLabel(photos.length, 'photo')}</span>${admin() && photo ? `<button class="secondary-button cover-choice" data-admin data-cover-photo="${esc(photo.id)}" ${album.coverPhotoId === photo.id ? 'disabled' : ''}>${album.coverPhotoId === photo.id ? 'Current cover' : 'Set as cover'}</button>` : ''}</div><div id="albumThumbnails" class="photo-thumbnails">${photos.map(item => `<button data-photo-id="${esc(item.id)}" class="${item.id === photo?.id ? 'active' : ''}" aria-label="${admin() && album.coverPhotoId === item.id ? 'Current cover · ' : ''}View ${esc(item.caption || item.filename || 'photograph')}" aria-pressed="${item.id === photo?.id}">${photoMarkup({ ...item, src: item.thumbnailSrc || item.src }, '')}${admin() && album.coverPhotoId === item.id ? '<span class="cover-badge">Cover</span>' : ''}</button>`).join('')}</div>${photo ? `<p class="photo-caption">${esc(photo.caption || '')}</p><p id="photoCredit" class="photo-credit">${esc(photo.kind === 'personal' ? 'Garden photograph' : 'Reference photograph' + (photo.credit ? ' · © ' + photo.credit : ''))}${displayDate(photo) ? `<br>${esc(displayDate(photo))}` : ''}${photo.source_url ? `<br><a href="${esc(sourceURL(photo.source_url))}" target="_blank" rel="noopener noreferrer">View image source</a>` : ''}</p>` : ''}${admin() && photo ? `<div class="photo-admin" data-admin><button data-edit-photo="${esc(photo.id)}">Edit photo</button><button data-move-photo="${esc(photo.id)}" data-direction="-1" ${album.photos.indexOf(photo) <= 1 ? 'disabled' : ''}>Move earlier</button><button data-move-photo="${esc(photo.id)}" data-direction="1" ${photo.id === album.coverPhotoId || album.photos.indexOf(photo) === album.photos.length - 1 ? 'disabled' : ''}>Move later</button><button data-delete-photo="${esc(photo.id)}">Delete photograph</button></div>` : ''}</div><div class="album-info"><p class="album-category">${esc(categories[album.species] || album.species || 'Uncategorized')}</p><h2 id="albumTitle">${esc(album.display_name || album.name)}</h2>${chineseAlias ? `<p class="cultivar-alias album-chinese-alias" lang="zh-Hans">${esc(chineseAlias)}</p>` : ''}${album.display_name && album.display_name !== album.name ? `<p class="album-latin">${esc(album.name)}</p>` : ''}${aliases.length ? `<p class="album-aliases">Also known as · ${esc(aliases.join(' / '))}</p>` : ''}<p class="album-description">${esc(album.summary_zh || album.description || 'No cultivar description yet.').replace(/\n/g, '<br>')}</p><dl class="album-facts"><div><dt>Category</dt><dd>${esc(categories[album.species] || album.species || 'Uncategorized')}</dd></div><div><dt>Color</dt><dd>${esc(colors[album.color] || 'See description')}</dd></div><div><dt>Form</dt><dd>${esc(formLabel(album.form) || 'See description')}</dd></div><div><dt>Bloom size</dt><dd>${esc(sizes[album.size] || album.size || 'Not specified')}</dd></div><div><dt>Registered year</dt><dd>${window.CamelliaModel.registrationYear(album.registeredYear) ?? 'Unknown'}</dd></div><div><dt>Added to gallery</dt><dd>${esc(addedDateLabel(album))}</dd></div></dl>${album.notes ? `<div class="album-notes"><h3>Garden notes</h3><p>${esc(album.notes).replace(/\n/g, '<br>')}</p></div>` : ''}${state().settings.showCultivarRecordLinks ? `<a class="source-link" href="${esc(sourceURL(album.reference_url))}" target="_blank" rel="noopener noreferrer">View full cultivar record ${icon('external')}</a>` : ''}<div class="album-photo-tabs" role="group" aria-label="Photo source">${[['all', 'All photos']].map(([kind, label]) => `<button data-photo-filter="${kind}" aria-pressed="${albumView.filter === kind}">${label} ${album.photos.filter(item => kind === 'all' || item.kind === kind).length}</button>`).join('')}</div>${admin() ? `<div class="album-actions"><button class="primary-button" data-add-to="${esc(album.id)}" data-admin>${icon('plus')}Add photos to this cultivar</button><button data-edit-album="${esc(album.id)}" data-admin>Edit cultivar</button><button data-delete-album="${esc(album.id)}" data-admin>Delete album</button></div>` : ''}</div></div>`;
     if ($('#lightbox')?.open) renderLightbox();
     restoreFocus(focus, root, $('#albumDialog .album-close'));
   }
@@ -864,7 +868,17 @@
       if (!requireAdmin()) return;
       selectionGeneration++; $('#cultivarSearch').value = ''; setSelected(null); renderMatches(); $('#cultivarSearch').focus(); return;
     }
-    if (button.id === 'resetFilters' || button.id === 'emptyReset') { resetFilters(); return; }
+    if (button.id === 'resetFilters' || button.id === 'emptyReset') {
+      const hadFocus = document.activeElement === button;
+      resetFilters();
+      // Resetting hides the panel or empty state that held this button; keep keyboard focus on a stable control.
+      if (hadFocus && button.closest('[hidden]')) {
+        const target = button.id === 'resetFilters' ? $('.filter-toggle') : $('#collectionTitle');
+        target.focus({ preventScroll: true });
+        if (target.id === 'collectionTitle') target.scrollIntoView({ block: 'nearest' });  // the heading can sit above the restored cards
+      }
+      return;
+    }
     if (button.matches('.filter-toggle')) {
       const expanded = button.getAttribute('aria-expanded') === 'true';
       button.setAttribute('aria-expanded', !expanded); $('#moreFilters').hidden = expanded;
@@ -1002,10 +1016,15 @@
       if (dialog.id === 'confirmDialog') return;
       event.preventDefault(); requestClose(dialog.id);
     });
+    // Light dismiss: a primary press that starts on the backdrop and a click that ends there. Closing on click (not pointerup) keeps a
+    // touch tap's click from reaching the page under the closed dialog; a text-selection drag from inside never dismisses.
+    const outside = event => { const rect = dialog.getBoundingClientRect(); return event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom); };
+    dialog.addEventListener('pointerdown', event => { backdropPresses.set(dialog, event.button === 0 && outside(event)); });
+    dialog.addEventListener('pointercancel', () => { backdropPresses.delete(dialog); });
     dialog.addEventListener('click', event => {
-      if (event.target !== dialog || dialog.id === 'confirmDialog') return;
-      const rect = dialog.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose(dialog.id);
+      const dismiss = backdropPresses.get(dialog) === true && outside(event);
+      backdropPresses.delete(dialog);
+      if (dismiss && dialog.id !== 'confirmDialog') requestClose(dialog.id);
     });
     dialog.addEventListener('close', () => {
       dirtyDialogs.delete(dialog.id);

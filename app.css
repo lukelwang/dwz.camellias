@@ -20,6 +20,7 @@ button { min-width: 44px; min-height: 44px; font-size: 14px; line-height: 1.45; 
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, a, input, select, textarea, summary { outline-offset: 3px; }
 :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--ui-accent); }
+#collectionTitle:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 6px; border-radius: 4px; }
 textarea { resize: vertical; }
 html[data-dark="true"] select {
   appearance: none;
@@ -315,6 +316,8 @@ html[data-dark="true"] .hero-art:disabled { opacity: 1; cursor: default; }
 .hero-empty .empty-hero-flower svg { width: 100%; height: 100%; stroke-width: .45; }
 html[data-dark="true"] .hero-empty { opacity: 1; cursor: default; background: radial-gradient(ellipse at 78% 35%, #3c4a2b80, transparent 48%), radial-gradient(ellipse at 85% 65%, #79613d45, transparent 45%), #101310; }
 .hero-empty .round-arrow, .hero-empty .hero-art-bottom small { display: none; }
+/* While the first load runs, keep the placeholder captions out of layout so the featured cultivar's captions arrive without a shift. */
+body[aria-busy="true"] .hero-empty :is(.hero-art-top, .hero-art-bottom) { display: none; }
 .card-image .photo-image:has(img[src$="flower.svg"]) { display: grid; place-items: center; background: #20291c; }
 .card-image .photo-image img[src$="flower.svg"] { width: 56px; height: 56px; object-fit: contain; opacity: .45; }
 html[data-dark="true"] .garden-note { gap: 24px; padding: 32px; border: 0; border-top: 1px solid var(--ui-line); border-bottom: 1px solid var(--ui-line); border-radius: 0; background: transparent; }
@@ -340,6 +343,10 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
   html[data-dark="true"] .site-header { flex-wrap: wrap; gap: 12px 24px; }
   .header-tools { margin-left: auto; }
   html[data-dark="true"] .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1024px) {
+  /* Up to 1024px the hero's bottom band holds the cultivar line and arrow; the band above the eyebrow is empty. Keep the mark on one line there. */
+  .hero-art > .photo-watermark { top: 10px; bottom: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (max-width: 768px) {
   .page-width { width: calc(100% - 48px); }
@@ -372,6 +379,8 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
       linear-gradient(270deg, #101310a3 0%, #10131000 12%);
   }
   html[data-dark="true"] .hero-art-top { display: none; }
+  .hero-link { position: relative; }
+  .hero-link::before { content: ""; position: absolute; inset: -9px 0; }
   html[data-dark="true"] .hero h1 { font-size: clamp(40px, 11vw, 49px); line-height: 1.25; }
   html[data-dark="true"] .hero-stats { gap: 22px; }
   .hero-stats > div { min-width: 0; padding-right: 14px; }

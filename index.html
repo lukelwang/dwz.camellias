@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="styles.css?v=e9da18a85df2">
   <link rel="stylesheet" href="themes.css?v=ae11aebacf8b">
   <link rel="stylesheet" href="catalogue-picker.css?v=1a1a496b64e3">
-  <link rel="stylesheet" href="app.css?v=f1b8e6f259e0">
+  <link rel="stylesheet" href="app.css?v=cb184ee53b01">
   <link rel="icon" href="assets/flower.svg" type="image/svg+xml">
 </head>
 <body data-page="gallery">
@@ -30,7 +30,7 @@
   </defs></svg>
 
 
-  <div id="storeStatus" class="store-status" role="status" aria-live="polite"><span id="storeMessage">Opening the garden…</span><button id="reloadGallery" hidden>Reload the garden</button></div>
+  <div id="storeStatus" class="store-status" role="status" aria-live="polite" hidden><span id="storeMessage"></span><button id="reloadGallery" hidden>Reload the garden</button></div>
 
 
   <header class="site-header page-width">
@@ -58,12 +58,12 @@
     </section>
 
     <section id="collection" class="collection page-width" aria-labelledby="collectionTitle">
-      <div class="section-heading"><div><span class="section-index">THE COLLECTION / 001</span><h2 id="collectionTitle">The collection<span id="headingCount">0</span></h2></div><p>One cultivar, one album. Every bloom has a story.</p></div>
+      <div class="section-heading"><div><span class="section-index">THE COLLECTION / 001</span><h2 id="collectionTitle" tabindex="-1">The collection<span id="headingCount">0</span></h2></div><p>One cultivar, one album. Every bloom has a story.</p></div>
       <div class="search-line"><div class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search camellias…" aria-label="Search cultivar names, Chinese aliases, or descriptions" autocomplete="off"><kbd>/</kbd></div><button class="filter-toggle" aria-expanded="false" aria-controls="moreFilters"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></svg>Filters<span id="filterBadge" hidden></span></button></div>
       <div class="filter-row"><div class="category-tabs" role="group" aria-label="Filter by camellia species"><button data-category="all" class="selected" aria-pressed="true">All species</button><button data-category="Japonica" aria-pressed="false">Japonica</button><button data-category="Sasanqua" aria-pressed="false">Sasanqua</button><button data-category="Reticulata" aria-pressed="false">Reticulata</button><button data-category="NRH" aria-pressed="false">Hybrid</button><button id="otherSpecies" data-category="Other" aria-pressed="false" hidden>Other</button></div></div>
       <div id="moreFilters" class="more-filters" hidden><label>Color<select id="colorFilter"><option value="all">All colors</option><option value="pink">Pink</option><option value="white">White</option><option value="red">Red</option><option value="bicolor">Bicolor</option><option value="yellow">Pale yellow</option></select></label><fieldset id="formFilter" class="flower-form-field" data-multi-field><legend>Flower form</legend><div class="form-options"><label><input type="checkbox" value="formal"><span>Formal double</span></label><label><input type="checkbox" value="single"><span>Single</span></label><label><input type="checkbox" value="semi"><span>Semi-double</span></label><label><input type="checkbox" value="peony"><span>Peony</span></label><label><input type="checkbox" value="anemone"><span>Anemone</span></label></div><p class="field-hint">Match any selected form. Leave blank to show all forms.</p></fieldset><button id="resetFilters">Clear filters</button></div>
       <div class="results-toolbar"><p id="resultSummary" role="status" aria-live="polite">Opening the garden…</p><div><label class="sort-label"><span>Sort by</span><select id="sort"><option value="curated">Random order</option><option value="newly-added" selected>Newly added</option><option value="registered-year">Registered year</option><option value="name">Cultivar A–Z</option><option value="photos">Photo count</option></select></label></div></div>
-      <div id="gallery" class="gallery" aria-label="Camellia cultivar albums"></div>
+      <div id="gallery" class="gallery"></div>
       <div id="emptyState" class="empty-state" hidden><svg><use href="#i-flower"/></svg><h3>This bloom has not appeared here yet.</h3><p>Try another name or broaden your filters.</p><button id="emptyReset">View all cultivars <svg><use href="#i-arrow"/></svg></button><button id="emptyReload" hidden>Try loading again <svg><use href="#i-arrow"/></svg></button></div>
       <p class="gallery-end"><span></span> Blooms return. Memories remain.<span></span></p>
     </section>
@@ -72,7 +72,7 @@
   </main>
   <footer class="site-footer page-width"><a class="brand" href="#"><svg><use href="#i-flower"/></svg><span>DWZ Camellias</span></a><p>A personal garden. A lasting affection.</p></footer>
 
-  <dialog id="albumDialog" class="album-dialog" aria-label="Cultivar album"><div id="albumContent"></div></dialog>
+  <dialog id="albumDialog" class="album-dialog" aria-labelledby="albumTitle"><div id="albumContent"></div></dialog>
 
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -80,6 +80,6 @@
 <script defer src="src/model.js?v=19f05bc3bc9c"></script>
 <script defer src="src/photo-io.js?v=bc570f2a593d"></script>
 <script defer src="src/github-store.js?v=a6aa870f0704"></script>
-<script defer src="src/controller.js?v=ee5f2b896142"></script>
+<script defer src="src/controller.js?v=97a8becf0b96"></script>
 </body>
 </html>
