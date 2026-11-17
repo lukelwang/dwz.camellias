@@ -245,6 +245,42 @@ def flow_overflow_320(context, vp):
     no_overflow(page, '320 album open')
     finish(page, errors)
 
+HERO_SAMPLES = 6
+HERO_BOXES = """() => { const hero = document.querySelector('.hero').getBoundingClientRect(); const box = el => { const r = el.getBoundingClientRect(); return {x: r.left, y: r.top, r: r.right, b: r.bottom}; };
+    const mark = document.querySelector('.hero-art > .photo-watermark'); const style = mark && getComputedStyle(mark);
+    const others = [...document.querySelectorAll('.hero *')].filter(el => !el.closest('svg') && !el.matches('img, .hero-art, .hero-art-shade, .photo-watermark')
+        && ([...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) || el.matches('a, button, .round-arrow')))
+      .filter(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width && r.height && s.display !== 'none' && s.visibility !== 'hidden'; })
+      .map(el => ({name: el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.split(' ')[0] : ''), ...box(el)}));
+    return {hero: box(document.querySelector('.hero')), mark: mark && {...box(mark), visible: style.visibility === 'visible' && style.display !== 'none' && Number(style.opacity) > 0}, others,
+      featured: document.querySelector('.hero-art').getAttribute('aria-label')}; }"""
+
+def flow_hero_phone(context, vp):
+    """Phones: the hero watermark collides with no hero text or control; the hero link's hit area is at least 44x44."""
+    page, doc, errors = open_page(context)
+    page.wait_for_function("() => { const i = document.querySelector('.hero-art img'); return i && i.complete && document.querySelector('.hero-art > .photo-watermark'); }")
+    problems, seen = [], set()
+    for sample in range(HERO_SAMPLES):  # the featured cultivar changes on each hero activation; the watermark must clear every layout
+        data = page.evaluate(HERO_BOXES); seen.add(data['featured']); mark, hero = data['mark'], data['hero']
+        check(mark and mark['visible'] and mark['r'] - mark['x'] > 0 and mark['b'] - mark['y'] > 0, f'hero watermark is visible ({vp})')
+        check(mark['x'] >= hero['x'] and mark['r'] <= hero['r'] and mark['y'] >= hero['y'] and mark['b'] <= hero['b'], f'hero watermark lies inside the hero ({vp}): {mark} vs {hero}')
+        hits = [o['name'] for o in data['others'] if o['x'] < mark['r'] and mark['x'] < o['r'] and o['y'] < mark['b'] and mark['y'] < o['b']]
+        if hits:
+            problems.append(f'hero watermark overlaps hero text or controls ({data["featured"]}): {hits}'); break
+        if sample < HERO_SAMPLES - 1 and page.is_enabled('.hero-art'):
+            page.focus('.hero-art'); page.keyboard.press('Enter')
+            page.wait_for_function("(label) => document.querySelector('.hero-art').getAttribute('aria-label') !== label && document.querySelector('.hero-art img').complete", arg=data['featured'])
+    if not problems:
+        check(len(seen) >= min(2, sum(bool(a['photos']) for a in doc['albums'])), f'sampled {len(seen)} different featured cultivars')
+    page.locator('.hero-link').scroll_into_view_if_needed()
+    target = page.evaluate("""() => { const link = document.querySelector('.hero-link'); const r = link.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const hit = (x, y) => !!document.elementFromPoint(x, y)?.closest('.hero-link');
+        return {width: Math.round(r.width), up: hit(cx, cy - 22), down: hit(cx, cy + 22), left: hit(cx - 22, cy), right: hit(cx + 22, cy)}; }""")
+    if not (target['width'] >= 44 and all(target[k] for k in ('up', 'down', 'left', 'right'))):
+        problems.append(f'"Explore the garden" hit area is under 44x44: {target}')
+    check(not problems, f'hero on phones ({vp}): ' + ' | '.join(problems))
+    finish(page, errors)
+
 def flow_owner_gate(context, vp):
     check(OWNER, 'owner page found (OWNER_PATH or build-pages filename pattern)')
     page, doc, errors = open_page(context, OWNER)
@@ -256,7 +292,7 @@ def flow_owner_gate(context, vp):
     finish(page, errors)
 
 PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search, flow_filters, flow_album, flow_fullscreen)]
-PLAN += [('320', flow_overflow_320), ('390', flow_owner_gate)]
+PLAN += [('320', flow_overflow_320), ('320', flow_hero_phone), ('390', flow_hero_phone), ('390', flow_owner_gate)]
 
 def main():
     print(redact(f'smoke: {BROWSER} {BASE_URL} api={"LIVE" if LIVE_API else "stubbed@" + FIXTURE_SHA[:7]} pinned-counts={"on" if PINNED else "off"}'))

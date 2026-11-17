@@ -372,6 +372,10 @@ html[data-dark="true"] .garden-note p { color: var(--ui-muted); font-size: 14px;
       linear-gradient(270deg, #101310a3 0%, #10131000 12%);
   }
   html[data-dark="true"] .hero-art-top { display: none; }
+  /* Phones: the bottom band holds the cultivar line and arrow; the band above the eyebrow is empty. */
+  .hero-art > .photo-watermark { top: 10px; bottom: auto; }
+  .hero-link { position: relative; }
+  .hero-link::before { content: ""; position: absolute; inset: -9px 0; }
   html[data-dark="true"] .hero h1 { font-size: clamp(40px, 11vw, 49px); line-height: 1.25; }
   html[data-dark="true"] .hero-stats { gap: 22px; }
   .hero-stats > div { min-width: 0; padding-right: 14px; }
