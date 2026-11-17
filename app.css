@@ -20,6 +20,7 @@ button { min-width: 44px; min-height: 44px; font-size: 14px; line-height: 1.45; 
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, a, input, select, textarea, summary { outline-offset: 3px; }
 :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--ui-accent); }
+#collectionTitle:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 6px; border-radius: 4px; }
 textarea { resize: vertical; }
 html[data-dark="true"] select {
   appearance: none;

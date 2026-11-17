@@ -58,6 +58,7 @@ REF_LOOKUP = re.compile(r'^https://api\.github\.com/repos/[^/]+/[^/]+/git/ref/he
 VIEWPORTS = {
     '390': dict(viewport={'width': 390, 'height': 844}, device_scale_factor=3, is_mobile=True, has_touch=True),
     '1440': dict(viewport={'width': 1440, 'height': 900}),
+    '1440t': dict(viewport={'width': 1440, 'height': 900}, has_touch=True),  # desktop layout with touch: backdrop tap case only
     '320': dict(viewport={'width': 320, 'height': 640}, device_scale_factor=2, is_mobile=True, has_touch=True),
     **{w: dict(viewport={'width': int(w), 'height': 900}) for w in ('581', '700', '768', '1024')},  # hero layout breakpoints between phone and desktop
 }
@@ -273,10 +274,13 @@ def flow_focus_reset(context, vp):
     page.click('.filter-toggle'); page.select_option('#colorFilter', 'pink')
     page.focus('#resetFilters'); page.keyboard.press('Enter')
     check(page.evaluate("() => document.activeElement.matches('.filter-toggle')"), f'Clear filters moves focus to the Filters button (got {page.evaluate(ACTIVE)})')
+    page.close(); page, doc, errors = open_page(context)  # fresh page: View all from a plain search, as a visitor would reach it
     page.fill('#search', 'zzzz'); page.wait_for_selector('#emptyReset', state='visible')
     page.focus('#emptyReset'); page.keyboard.press('Enter')
     check(cards(page) == len(doc['albums']), 'View all cultivars restores every cultivar')
     check(page.evaluate("() => document.activeElement.id === 'collectionTitle'"), f'View all cultivars moves focus to the collection heading (got {page.evaluate(ACTIVE)})')
+    heading = page.evaluate("() => { const r = document.querySelector('#collectionTitle').getBoundingClientRect(); return {top: Math.round(r.top), bottom: Math.round(r.bottom), viewport: innerHeight}; }")
+    check(heading['top'] >= 0 and heading['bottom'] <= heading['viewport'], f'the focused collection heading is on screen after View all: {heading}')
     finish(page, errors)
 
 OUTSIDE_POINT = """() => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), w = innerWidth, h = innerHeight;
@@ -300,6 +304,11 @@ def flow_album_dialog(context, vp):
     for button in ('right', 'middle'):
         page.mouse.click(point['x'], point['y'], button=button); page.wait_for_timeout(150)
         check(page.is_visible('#albumDialog'), f'a {button}-button click on the backdrop keeps the album open ({point})')
+    page.evaluate("""(p) => { const d = document.querySelector('#albumDialog');
+        d.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: 'touch', clientX: p.x, clientY: p.y}));
+        d.dispatchEvent(new PointerEvent('pointercancel', {bubbles: true, isPrimary: true, pointerType: 'touch'})); d.click(); }""", point)
+    page.wait_for_timeout(150)
+    check(page.is_visible('#albumDialog'), f'a cancelled backdrop press followed by a scripted click keeps the album open ({point})')
     box = page.locator('#albumDialog .album-description').bounding_box()
     page.mouse.move(box['x'] + min(40, box['width'] / 2), box['y'] + min(10, box['height'] / 2)); page.mouse.down()
     page.mouse.move(point['x'], point['y'], steps=12); page.mouse.up(); page.wait_for_timeout(200)
@@ -313,22 +322,32 @@ def flow_album_dialog(context, vp):
         touch_tap_closes_cleanly(page, doc, vp)
     finish(page, errors)
 
+TAP_POINT = """(order) => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), w = innerWidth, h = innerHeight;
+    const all = {below: [0, r.bottom, w, h], above: [0, 0, w, r.top], left: [0, r.top, r.left, r.bottom], right: [r.right, r.top, w, r.bottom]};
+    for (const [region, x1, y1, x2, y2] of order.map(name => [name, ...all[name]])) for (const card of document.querySelectorAll('#gallery .card-open')) {
+      const b = card.getBoundingClientRect(), left = Math.max(b.left, x1 + 1), top = Math.max(b.top, y1 + 1), right = Math.min(b.right, x2 - 1), bottom = Math.min(b.bottom, y2 - 1);
+      if (right <= left || bottom <= top) continue;
+      const x = (left + right) / 2, y = (top + bottom) / 2, outside = x < r.left || x > r.right || y < r.top || y > r.bottom;
+      if (outside && document.elementFromPoint(x, y)?.id === 'albumDialog') return {region, x, y, under: card.dataset.open, rect: [r.left, r.top, r.right, r.bottom].map(Math.round)};
+    }
+    return {region: null, rect: [r.left, r.top, r.right, r.bottom].map(Math.round)}; }"""
+
 def touch_tap_closes_cleanly(page, doc, vp):
-    """A touch tap on the backdrop strip below the album closes it, and the tap's click must not reach the card underneath."""
+    """A touch tap on the backdrop over a gallery card closes the album, and the tap's click must not reach the card underneath."""
     setup = page.evaluate("""() => { const cards = [...document.querySelectorAll('#gallery .card-open')]; const card = cards[Math.min(2, cards.length - 1)];
         scrollBy(0, card.getBoundingClientRect().top - (innerHeight - 140)); card.focus({preventScroll: true}); return card.dataset.open; }""")
     page.keyboard.press('Enter'); page.wait_for_selector('#albumDialog[open]')
     opened = page.text_content('#albumDialog h2')
-    tap = page.evaluate("""() => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), y = (r.bottom + innerHeight) / 2;
-        const under = [...document.querySelectorAll('#gallery .card-open')].find(c => { const b = c.getBoundingClientRect(); return b.top < y && b.bottom > y && b.left >= r.left && b.right <= r.right; });
-        const x = under ? (() => { const b = under.getBoundingClientRect(); return (b.left + b.right) / 2; })() : r.left + r.width / 2;
-        window.__cardClicks = []; document.addEventListener('click', e => { const card = e.target.closest?.('.card-open'); if (card) __cardClicks.push(card.dataset.open); }, true);
-        return {x, y, under: under?.dataset.open || null, top: document.elementFromPoint(x, y)?.id || null, rect: [r.left, r.top, r.right, r.bottom].map(Math.round)}; }""")
-    check(tap['under'] and tap['top'] == 'albumDialog' and tap['y'] > tap['rect'][3], f'a card lies under the backdrop strip below the album ({vp}): {tap}')
+    # Phones: the strip below the nearly full-screen album. Wider layouts: the side backdrop over a card first.
+    tap = page.evaluate(TAP_POINT, ['below', 'left', 'right', 'above'] if vp == '390' else ['left', 'right', 'below', 'above'])
+    check(tap['region'], f'a gallery card lies under the backdrop outside the album ({vp}): {tap}')
+    if vp == '390':
+        check(tap['region'] == 'below', f'at 390 the tap uses the strip below the album: {tap}')
+    page.evaluate("() => { window.__cardClicks = []; document.addEventListener('click', e => { const card = e.target.closest?.('.card-open'); if (card) __cardClicks.push(card.dataset.open); }, true); }")
     page.touchscreen.tap(tap['x'], tap['y']); page.wait_for_timeout(500)
     after = page.evaluate("""() => ({open: document.querySelector('#albumDialog').open, heading: document.querySelector('#albumDialog').open ? document.querySelector('#albumDialog h2')?.textContent : null,
         cardClicks: __cardClicks})""")
-    check(not after['open'] and not after['cardClicks'], f'a backdrop tap closes "{opened}" without opening an album ({vp}, opener {setup}, card under tap {tap["under"]}): {after}')
+    check(not after['open'] and not after['cardClicks'], f'a backdrop tap closes "{opened}" without opening an album ({vp}, opener {setup}, {tap["region"]} tap over card {tap["under"]}): {after}')
 
 def flow_fullscreen(context, vp):
     page, doc, errors = open_page(context)
@@ -431,7 +450,7 @@ def flow_owner_gate(context, vp):
     finish(page, errors)
 
 PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search, flow_filters, flow_album, flow_fullscreen, flow_focus_reset, flow_album_dialog)]
-PLAN += [('390', flow_load_failure), ('1440', flow_load_failure), ('320', flow_overflow_320), ('390', flow_owner_gate)] + [(vp, flow_hero) for vp in ('320', '390', '581', '700', '768', '1024')]
+PLAN += [('1440t', flow_album_dialog), ('390', flow_load_failure), ('1440', flow_load_failure), ('320', flow_overflow_320), ('390', flow_owner_gate)] + [(vp, flow_hero) for vp in ('320', '390', '581', '700', '768', '1024')]
 
 def main():
     print(redact(f'smoke: {BROWSER} {BASE_URL} api={"LIVE" if LIVE_API else "stubbed@" + FIXTURE_SHA[:7]} pinned-counts={"on" if PINNED else "off"}'))

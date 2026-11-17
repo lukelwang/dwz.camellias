@@ -872,7 +872,11 @@
       const hadFocus = document.activeElement === button;
       resetFilters();
       // Resetting hides the panel or empty state that held this button; keep keyboard focus on a stable control.
-      if (hadFocus && button.closest('[hidden]')) (button.id === 'resetFilters' ? $('.filter-toggle') : $('#collectionTitle')).focus({ preventScroll: true });
+      if (hadFocus && button.closest('[hidden]')) {
+        const target = button.id === 'resetFilters' ? $('.filter-toggle') : $('#collectionTitle');
+        target.focus({ preventScroll: true });
+        if (target.id === 'collectionTitle') target.scrollIntoView({ block: 'nearest' });  // the heading can sit above the restored cards
+      }
       return;
     }
     if (button.matches('.filter-toggle')) {
@@ -1016,6 +1020,7 @@
     // touch tap's click from reaching the page under the closed dialog; a text-selection drag from inside never dismisses.
     const outside = event => { const rect = dialog.getBoundingClientRect(); return event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom); };
     dialog.addEventListener('pointerdown', event => { backdropPresses.set(dialog, event.button === 0 && outside(event)); });
+    dialog.addEventListener('pointercancel', () => { backdropPresses.delete(dialog); });
     dialog.addEventListener('click', event => {
       const dismiss = backdropPresses.get(dialog) === true && outside(event);
       backdropPresses.delete(dialog);
