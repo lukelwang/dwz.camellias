@@ -39,6 +39,7 @@
   let recoveryRequired = false;
   const dirtyDialogs = new Set();
   const dialogOpeners = new Map();
+  const backdropPresses = new WeakMap();
   const editorBaselines = new Map();
   const editorFields = {
     albumEditDialog: { editDisplayName: 'display_name', editCanonicalName: 'name', editSpecies: 'species', editSize: 'size', editColor: 'color', editForm: 'form', editDescription: 'description', editNotes: 'notes', editRegisteredYear: 'registeredYear' },
@@ -230,6 +231,7 @@
     if (dialog && !dialog.open) {
       const root = focusRoot();
       dialogOpeners.set(id, { root, focus: rememberFocus(root) });
+      backdropPresses.delete(dialog);
       dialog.showModal();
     }
   }
@@ -870,7 +872,7 @@
       const hadFocus = document.activeElement === button;
       resetFilters();
       // Resetting hides the panel or empty state that held this button; keep keyboard focus on a stable control.
-      if (hadFocus && button.closest('[hidden]')) (button.id === 'resetFilters' ? $('.filter-toggle') : $('#search')).focus({ preventScroll: true });
+      if (hadFocus && button.closest('[hidden]')) (button.id === 'resetFilters' ? $('.filter-toggle') : $('#collectionTitle')).focus({ preventScroll: true });
       return;
     }
     if (button.matches('.filter-toggle')) {
@@ -1010,13 +1012,13 @@
       if (dialog.id === 'confirmDialog') return;
       event.preventDefault(); requestClose(dialog.id);
     });
-    // Light dismiss: close only when both the press and the release land on the backdrop, so a text-selection drag that ends outside keeps it open.
+    // Light dismiss: a primary press that starts on the backdrop and a click that ends there. Closing on click (not pointerup) keeps a
+    // touch tap's click from reaching the page under the closed dialog; a text-selection drag from inside never dismisses.
     const outside = event => { const rect = dialog.getBoundingClientRect(); return event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom); };
-    let pressedOutside = false;
-    dialog.addEventListener('pointerdown', event => { pressedOutside = outside(event); });
-    dialog.addEventListener('pointerup', event => {
-      const dismiss = pressedOutside && outside(event);
-      pressedOutside = false;
+    dialog.addEventListener('pointerdown', event => { backdropPresses.set(dialog, event.button === 0 && outside(event)); });
+    dialog.addEventListener('click', event => {
+      const dismiss = backdropPresses.get(dialog) === true && outside(event);
+      backdropPresses.delete(dialog);
       if (dismiss && dialog.id !== 'confirmDialog') requestClose(dialog.id);
     });
     dialog.addEventListener('close', () => {

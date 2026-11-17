@@ -263,16 +263,20 @@ def flow_album(context, vp):
     check(active_open(page) == album_id, 'Close button returns focus to the album card')
     finish(page, errors)
 
+ACTIVE = """() => { const a = document.activeElement; if (!a || a === document.body) return 'body';
+    const classes = typeof a.className === 'string' ? a.className.trim().split(/\\s+/).filter(Boolean).map(c => '.' + c).join('') : '';
+    return (a.tagName.toLowerCase() + (a.id ? '#' + a.id : '') + classes).replace(/\\s+/g, ' ').slice(0, 80); }"""  # single-line descriptor for messages
+
 def flow_focus_reset(context, vp):
     """Keyboard focus stays on a stable control after "Clear filters" and "View all cultivars" hide the button that held it."""
     page, doc, errors = open_page(context)
     page.click('.filter-toggle'); page.select_option('#colorFilter', 'pink')
     page.focus('#resetFilters'); page.keyboard.press('Enter')
-    check(page.evaluate("() => document.activeElement.matches('.filter-toggle')"), f'Clear filters moves focus to the Filters button (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    check(page.evaluate("() => document.activeElement.matches('.filter-toggle')"), f'Clear filters moves focus to the Filters button (got {page.evaluate(ACTIVE)})')
     page.fill('#search', 'zzzz'); page.wait_for_selector('#emptyReset', state='visible')
     page.focus('#emptyReset'); page.keyboard.press('Enter')
     check(cards(page) == len(doc['albums']), 'View all cultivars restores every cultivar')
-    check(page.evaluate("() => document.activeElement.id === 'search'"), f'View all cultivars moves focus to the search box (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    check(page.evaluate("() => document.activeElement.id === 'collectionTitle'"), f'View all cultivars moves focus to the collection heading (got {page.evaluate(ACTIVE)})')
     finish(page, errors)
 
 OUTSIDE_POINT = """() => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), w = innerWidth, h = innerHeight;
@@ -285,7 +289,7 @@ def flow_album_dialog(context, vp):
     page, doc, errors = open_page(context)
     album_id = open_first_album(page, doc)
     name = page.text_content('#albumDialog h2')
-    check(page.evaluate("() => document.activeElement.matches('#albumDialog .album-close')"), f'keyboard open focuses Close (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    check(page.evaluate("() => document.activeElement.matches('#albumDialog .album-close')"), f'keyboard open focuses Close (got {page.evaluate(ACTIVE)})')
     labelled = page.evaluate("""() => { const d = document.querySelector('#albumDialog'); const ids = (d.getAttribute('aria-labelledby') || '').split(/\\s+/).filter(Boolean);
         return {ariaLabel: d.getAttribute('aria-label'), name: ids.map(id => document.getElementById(id)?.textContent || '').join(' ').trim(), galleryLabel: document.querySelector('#gallery').getAttribute('aria-label')}; }""")
     check(labelled == {'ariaLabel': None, 'name': name, 'galleryLabel': None}, f'album dialog is named by its heading and #gallery is unnamed: {labelled} vs "{name}"')
@@ -293,6 +297,9 @@ def flow_album_dialog(context, vp):
     check(snapshot.splitlines()[0].strip().startswith(f'- dialog "{name}"'), f'accessibility tree names the dialog "{name}": {snapshot.splitlines()[0][:120]}')
     point = page.evaluate(OUTSIDE_POINT)
     check('x' in point, f'a backdrop point exists outside the album ({vp}): {point}')
+    for button in ('right', 'middle'):
+        page.mouse.click(point['x'], point['y'], button=button); page.wait_for_timeout(150)
+        check(page.is_visible('#albumDialog'), f'a {button}-button click on the backdrop keeps the album open ({point})')
     box = page.locator('#albumDialog .album-description').bounding_box()
     page.mouse.move(box['x'] + min(40, box['width'] / 2), box['y'] + min(10, box['height'] / 2)); page.mouse.down()
     page.mouse.move(point['x'], point['y'], steps=12); page.mouse.up(); page.wait_for_timeout(200)
@@ -302,7 +309,26 @@ def flow_album_dialog(context, vp):
     check(active_open(page) == album_id, 'backdrop close returns focus to the album card')
     open_first_album(page, doc); page.keyboard.press('Escape')
     check(not page.is_visible('#albumDialog') and active_open(page) == album_id, 'Esc closes the album and returns focus to its card')
+    if VIEWPORTS[vp].get('has_touch'):
+        touch_tap_closes_cleanly(page, doc, vp)
     finish(page, errors)
+
+def touch_tap_closes_cleanly(page, doc, vp):
+    """A touch tap on the backdrop strip below the album closes it, and the tap's click must not reach the card underneath."""
+    setup = page.evaluate("""() => { const cards = [...document.querySelectorAll('#gallery .card-open')]; const card = cards[Math.min(2, cards.length - 1)];
+        scrollBy(0, card.getBoundingClientRect().top - (innerHeight - 140)); card.focus({preventScroll: true}); return card.dataset.open; }""")
+    page.keyboard.press('Enter'); page.wait_for_selector('#albumDialog[open]')
+    opened = page.text_content('#albumDialog h2')
+    tap = page.evaluate("""() => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), y = (r.bottom + innerHeight) / 2;
+        const under = [...document.querySelectorAll('#gallery .card-open')].find(c => { const b = c.getBoundingClientRect(); return b.top < y && b.bottom > y && b.left >= r.left && b.right <= r.right; });
+        const x = under ? (() => { const b = under.getBoundingClientRect(); return (b.left + b.right) / 2; })() : r.left + r.width / 2;
+        window.__cardClicks = []; document.addEventListener('click', e => { const card = e.target.closest?.('.card-open'); if (card) __cardClicks.push(card.dataset.open); }, true);
+        return {x, y, under: under?.dataset.open || null, top: document.elementFromPoint(x, y)?.id || null, rect: [r.left, r.top, r.right, r.bottom].map(Math.round)}; }""")
+    check(tap['under'] and tap['top'] == 'albumDialog' and tap['y'] > tap['rect'][3], f'a card lies under the backdrop strip below the album ({vp}): {tap}')
+    page.touchscreen.tap(tap['x'], tap['y']); page.wait_for_timeout(500)
+    after = page.evaluate("""() => ({open: document.querySelector('#albumDialog').open, heading: document.querySelector('#albumDialog').open ? document.querySelector('#albumDialog h2')?.textContent : null,
+        cardClicks: __cardClicks})""")
+    check(not after['open'] and not after['cardClicks'], f'a backdrop tap closes "{opened}" without opening an album ({vp}, opener {setup}, card under tap {tap["under"]}): {after}')
 
 def flow_fullscreen(context, vp):
     page, doc, errors = open_page(context)
