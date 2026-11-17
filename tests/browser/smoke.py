@@ -27,14 +27,32 @@ reached api.github.com; otherwise 1.
 import os, re, sys, unicodedata
 from collections import Counter
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from playwright.sync_api import sync_playwright
 
 BASE_URL = os.environ.get('BASE_URL', 'http://127.0.0.1:8770/').rstrip('/') + '/'
 BROWSER = os.environ.get('TEST_BROWSER', 'chromium')
-FIXTURE_SHA = os.environ.get('FIXTURE_SHA', 'd13f0f5eae0fab47781668ae58b4f8fb2d6845c3')
+PINNED_SHA = 'd13f0f5eae0fab47781668ae58b4f8fb2d6845c3'
+# Counts of the photo repository at PINNED_SHA. Bump PINNED_SHA and these together. They are asserted
+# only when the run uses PINNED_SHA (FIXTURE_SHA unset or equal, LIVE_API unset); otherwise they are skipped.
+PINNED_CARDS = 20
+PINNED_JAPONICA = 11
+PINNED_SANPEI_IDS = ['camellia-library-53616e7065692d74737562616b69']  # search "sanpei" -> Sanpei-tsubaki only
+FIXTURE_SHA = os.environ.get('FIXTURE_SHA', PINNED_SHA)
 LIVE_API = os.environ.get('LIVE_API') == '1'
+PINNED = FIXTURE_SHA == PINNED_SHA and not LIVE_API
 ROOT = Path(__file__).resolve().parents[2]
+OWNER = os.environ.get('OWNER_PATH') or next((p.name for p in sorted(ROOT.glob('*.html')) if re.fullmatch(r'studio-[a-f0-9]{12}\.html', p.name)), None)
+_HIDDEN = sorted({v for name in filter(None, {OWNER, os.environ.get('OWNER_PATH'), OWNER and Path(OWNER).name})
+                  for v in (name, quote(name), quote(name, safe=''))}, key=len, reverse=True)
+
+def redact(text):
+    """Every printed string passes through here so the owner page name never appears in output."""
+    text = str(text)
+    for value in _HIDDEN:
+        text = text.replace(value, '<owner page>')
+    return text
+
 GITHUB_HOST = re.compile(r'(^|\.)(github\.com|githubusercontent\.com|github\.io)$')
 REF_LOOKUP = re.compile(r'^https://api\.github\.com/repos/[^/]+/[^/]+/git/ref/heads/')
 VIEWPORTS = {
@@ -53,17 +71,17 @@ results = []
 
 def route_guard(route, request):
     global api_live
-    url = urlparse(request.url); host = url.hostname or ''
+    url = urlparse(request.url); host = (url.hostname or '').rstrip('.').lower()
     if GITHUB_HOST.search(host) and request.method != 'GET':
         network[f'{request.method} {host} (blocked)'] += 1
-        writes_blocked.append(f'{request.method} {host}{url.path}')
+        writes_blocked.append(redact(f'{request.method} {host}{url.path}'))
         return route.abort()
     if host == 'api.github.com' and not LIVE_API:
         network[f'{request.method} {host} (answered locally)'] += 1
         if REF_LOOKUP.match(request.url):
             return route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'},
                                  body='{"object":{"sha":"%s","type":"commit"}}' % FIXTURE_SHA)
-        api_aborted.append(url.path)
+        api_aborted.append(redact(url.path))
         return route.abort()
     if host == 'api.github.com':
         api_live += 1
@@ -91,7 +109,11 @@ def open_page(context, path=''):
         check(FIXTURE_SHA in response.url, 'gallery.json read at the pinned commit')
     page.wait_for_function("() => document.querySelectorAll('#gallery .cultivar-card').length || !document.querySelector('#emptyState').hidden")
     page.wait_for_function("() => document.body.getAttribute('aria-busy') !== 'true'")
-    return page, response.json(), errors
+    doc = response.json()
+    check(len(doc['albums']) > 0 and cards(page) > 0, f'gallery has cultivars (data {len(doc["albums"])}, cards {cards(page)})')
+    if PINNED:
+        check(len(doc['albums']) == PINNED_CARDS, f'pinned fixture has {PINNED_CARDS} cultivars (got {len(doc["albums"])})')
+    return page, doc, errors
 
 class Failure(Exception):
     pass
@@ -143,11 +165,14 @@ def flow_search(context, vp):
     check(chinese, 'fixture data has a Chinese alias to search')
     album, alias = chinese
     page.fill('#search', alias.strip())
-    check(album['id'] in card_ids(page), f'Chinese search "{alias}" shows its cultivar')
+    check(album['id'] in card_ids(page) and 0 < cards(page) < total, f'Chinese search "{alias}" narrows to its cultivar ({cards(page)} of {total})')
     accented = next((a for a in doc['albums'] if fold(a['name']) != a['name'].lower()), doc['albums'][0])
     query = fold(accented['name']).split()[0].split('-')[0]
     page.fill('#search', query)
-    check(accented['id'] in card_ids(page), f'accent-insensitive search "{query}" shows {accented["name"]}')
+    check(accented['id'] in card_ids(page) and 0 < cards(page) < total, f'accent-insensitive search "{query}" narrows to {accented["name"]} ({cards(page)} of {total})')
+    if PINNED:
+        page.fill('#search', 'sanpei')
+        check(card_ids(page) == PINNED_SANPEI_IDS, f'search "sanpei" shows exactly {PINNED_SANPEI_IDS} (got {card_ids(page)})')
     page.fill('#search', 'zzqqxx-no-such-camellia')
     check(cards(page) == 0 and page.is_visible('#emptyState'), 'unmatched search shows the empty state')
     page.fill('#search', '')
@@ -161,6 +186,7 @@ def flow_filters(context, vp):
     check(page.get_attribute('.filter-toggle', 'aria-expanded') == 'true' and page.is_visible('#moreFilters'), 'Filters opens its panel')
     no_overflow(page, f'{vp} filters open')
     color = Counter(a.get('color') for a in albums if a.get('color') in ('pink', 'white', 'red', 'bicolor', 'yellow')).most_common(1)
+    check(color or not PINNED, 'pinned fixture has a filterable colour')
     if color:
         page.select_option('#colorFilter', color[0][0])
         check(cards(page) == color[0][1], f'colour {color[0][0]} shows {color[0][1]} cultivars (got {cards(page)})')
@@ -168,6 +194,7 @@ def flow_filters(context, vp):
     page.click('#resetFilters')
     check(cards(page) == total and not page.is_visible('#moreFilters') and not page.is_visible('#filterBadge'), 'Clear filters restores every cultivar and closes the panel')
     japonica = sum(a.get('species') == 'Japonica' for a in albums)
+    check(japonica == PINNED_JAPONICA if PINNED else japonica > 0, f'fixture has Japonica cultivars ({japonica})')
     page.click('[data-category="Japonica"]')
     check(page.get_attribute('[data-category="Japonica"]', 'aria-pressed') == 'true' and cards(page) == japonica, f'Japonica tab shows {japonica} cultivars')
     page.click('[data-category="all"]')
@@ -219,9 +246,8 @@ def flow_overflow_320(context, vp):
     finish(page, errors)
 
 def flow_owner_gate(context, vp):
-    owner = os.environ.get('OWNER_PATH') or next((p.name for p in sorted(ROOT.glob('*.html')) if re.fullmatch(r'studio-[a-f0-9]{12}\.html', p.name)), None)
-    check(owner, 'owner page found (OWNER_PATH or build-pages filename pattern)')
-    page, doc, errors = open_page(context, owner)
+    check(OWNER, 'owner page found (OWNER_PATH or build-pages filename pattern)')
+    page, doc, errors = open_page(context, OWNER)
     page.wait_for_selector('#loginDialog[open]')
     state = page.evaluate("""() => ({focusInLogin: !!document.activeElement.closest('#loginDialog'), tokenEmpty: document.querySelector('#githubToken').value === '',
         adminVisible: [...document.querySelectorAll('[data-admin]')].filter(e => !e.hidden && e.getClientRects().length).length,
@@ -233,25 +259,28 @@ PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search
 PLAN += [('320', flow_overflow_320), ('390', flow_owner_gate)]
 
 def main():
-    print(f'smoke: {BROWSER} {BASE_URL} api={"LIVE" if LIVE_API else "stubbed@" + FIXTURE_SHA[:7]}')
+    print(redact(f'smoke: {BROWSER} {BASE_URL} api={"LIVE" if LIVE_API else "stubbed@" + FIXTURE_SHA[:7]} pinned-counts={"on" if PINNED else "off"}'))
     with sync_playwright() as playwright:
         browser = getattr(playwright, BROWSER).launch()
         contexts = {}
         for vp, flow in PLAN:
             context = contexts.get(vp) or contexts.setdefault(vp, new_context(browser, vp))
             name = f'{flow.__name__[5:]}@{vp}'
+            failed, message = False, ''
             try:
-                flow(context, vp); results.append((name, None)); print(f'  ok   {name}')
+                flow(context, vp)
             except Exception as error:  # report and continue with the next flow
-                message = str(error).splitlines()[0][:300]
-                results.append((name, message)); print(f'  FAIL {name}: {message}')
-            finally:
-                for page in context.pages: page.close()
+                failed = True
+                lines = [line for line in redact(error).splitlines() if line.strip()]  # redact before truncating
+                message = (lines or [type(error).__name__])[0][:300]
+            results.append((name, failed))
+            print(f'  FAIL {name}: {message}' if failed else f'  ok   {name}')
+            for page in context.pages: page.close()
         browser.close()
-    failed = [r for r in results if r[1]]
-    print('requests by method/host:', dict(sorted(network.items())))
-    print(f'api.github.com requests that reached the network: {api_live}; stubbed-API aborts: {len(api_aborted)}')
-    print(f'GitHub write attempts blocked: {len(writes_blocked)} {writes_blocked}')
+    failed = [name for name, bad in results if bad]
+    print(redact(f'requests by method/host: {dict(sorted(network.items()))}'))
+    print(redact(f'api.github.com requests that reached the network: {api_live}; stubbed-API aborts: {len(api_aborted)} {api_aborted}'))
+    print(redact(f'GitHub write attempts blocked: {len(writes_blocked)} {writes_blocked}'))
     guard_ok = not writes_blocked and (LIVE_API or api_live == 0)
     print(f'{len(results) - len(failed)} passed, {len(failed)} failed' + ('' if guard_ok else '; GitHub guard violated'))
     return 0 if not failed and guard_ok else 1
