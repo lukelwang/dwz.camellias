@@ -263,6 +263,47 @@ def flow_album(context, vp):
     check(active_open(page) == album_id, 'Close button returns focus to the album card')
     finish(page, errors)
 
+def flow_focus_reset(context, vp):
+    """Keyboard focus stays on a stable control after "Clear filters" and "View all cultivars" hide the button that held it."""
+    page, doc, errors = open_page(context)
+    page.click('.filter-toggle'); page.select_option('#colorFilter', 'pink')
+    page.focus('#resetFilters'); page.keyboard.press('Enter')
+    check(page.evaluate("() => document.activeElement.matches('.filter-toggle')"), f'Clear filters moves focus to the Filters button (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    page.fill('#search', 'zzzz'); page.wait_for_selector('#emptyReset', state='visible')
+    page.focus('#emptyReset'); page.keyboard.press('Enter')
+    check(cards(page) == len(doc['albums']), 'View all cultivars restores every cultivar')
+    check(page.evaluate("() => document.activeElement.id === 'search'"), f'View all cultivars moves focus to the search box (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    finish(page, errors)
+
+OUTSIDE_POINT = """() => { const r = document.querySelector('#albumDialog').getBoundingClientRect(), w = innerWidth, h = innerHeight;
+    const candidates = [[r.left / 2, r.top + r.height / 2], [(r.right + w) / 2, r.top + r.height / 2], [r.left + r.width / 2, r.top / 2], [r.left + r.width / 2, (r.bottom + h) / 2]];
+    const out = candidates.find(([x, y]) => (x < r.left || x > r.right || y < r.top || y > r.bottom) && x >= 0 && x < w && y >= 0 && y < h && document.elementFromPoint(x, y)?.id === 'albumDialog');
+    return out ? {x: out[0], y: out[1], rect: [r.left, r.top, r.right, r.bottom].map(Math.round)} : {rect: [r.left, r.top, r.right, r.bottom].map(Math.round)}; }"""
+
+def flow_album_dialog(context, vp):
+    """The album dialog is named by its heading, opens on Close, ignores a text-selection drag onto the backdrop and closes on a backdrop press."""
+    page, doc, errors = open_page(context)
+    album_id = open_first_album(page, doc)
+    name = page.text_content('#albumDialog h2')
+    check(page.evaluate("() => document.activeElement.matches('#albumDialog .album-close')"), f'keyboard open focuses Close (got {page.evaluate("() => document.activeElement.outerHTML.slice(0, 60)")})')
+    labelled = page.evaluate("""() => { const d = document.querySelector('#albumDialog'); const ids = (d.getAttribute('aria-labelledby') || '').split(/\\s+/).filter(Boolean);
+        return {ariaLabel: d.getAttribute('aria-label'), name: ids.map(id => document.getElementById(id)?.textContent || '').join(' ').trim(), galleryLabel: document.querySelector('#gallery').getAttribute('aria-label')}; }""")
+    check(labelled == {'ariaLabel': None, 'name': name, 'galleryLabel': None}, f'album dialog is named by its heading and #gallery is unnamed: {labelled} vs "{name}"')
+    snapshot = page.locator('#albumDialog').aria_snapshot()
+    check(snapshot.splitlines()[0].strip().startswith(f'- dialog "{name}"'), f'accessibility tree names the dialog "{name}": {snapshot.splitlines()[0][:120]}')
+    point = page.evaluate(OUTSIDE_POINT)
+    check('x' in point, f'a backdrop point exists outside the album ({vp}): {point}')
+    box = page.locator('#albumDialog .album-description').bounding_box()
+    page.mouse.move(box['x'] + min(40, box['width'] / 2), box['y'] + min(10, box['height'] / 2)); page.mouse.down()
+    page.mouse.move(point['x'], point['y'], steps=12); page.mouse.up(); page.wait_for_timeout(200)
+    check(page.is_visible('#albumDialog'), f'a text-selection drag released on the backdrop keeps the album open ({point})')
+    page.mouse.click(point['x'], point['y']); page.wait_for_timeout(200)
+    check(not page.is_visible('#albumDialog'), f'a press and release on the backdrop close the album ({point})')
+    check(active_open(page) == album_id, 'backdrop close returns focus to the album card')
+    open_first_album(page, doc); page.keyboard.press('Escape')
+    check(not page.is_visible('#albumDialog') and active_open(page) == album_id, 'Esc closes the album and returns focus to its card')
+    finish(page, errors)
+
 def flow_fullscreen(context, vp):
     page, doc, errors = open_page(context)
     album_id = open_first_album(page, doc)
@@ -363,7 +404,7 @@ def flow_owner_gate(context, vp):
           'owner page keeps the status banner and "Reload the garden" markup')
     finish(page, errors)
 
-PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search, flow_filters, flow_album, flow_fullscreen)]
+PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search, flow_filters, flow_album, flow_fullscreen, flow_focus_reset, flow_album_dialog)]
 PLAN += [('390', flow_load_failure), ('1440', flow_load_failure), ('320', flow_overflow_320), ('390', flow_owner_gate)] + [(vp, flow_hero) for vp in ('320', '390', '581', '700', '768', '1024')]
 
 def main():
