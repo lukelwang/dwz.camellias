@@ -55,6 +55,7 @@ Run locally and check the application:
 python3 -m http.server 8770 --bind 127.0.0.1
 node --test tests/*.test.js
 ```
+Browser smoke test (Chromium/WebKit, 390/1440/320px; GitHub API answered locally, GitHub writes blocked): `BASE_URL=http://127.0.0.1:8770/ TEST_BROWSER=chromium python3 tests/browser/smoke.py` (Python Playwright installed outside the repo; WebKit and setup commands are in the script header).
 
 Scripts and the EXIF reader are local files. exifr 7.1.3 uses the MIT license in `vendor/exifr-LICENSE.txt`.
 
