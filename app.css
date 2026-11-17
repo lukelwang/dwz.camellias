@@ -315,6 +315,8 @@ html[data-dark="true"] .hero-art:disabled { opacity: 1; cursor: default; }
 .hero-empty .empty-hero-flower svg { width: 100%; height: 100%; stroke-width: .45; }
 html[data-dark="true"] .hero-empty { opacity: 1; cursor: default; background: radial-gradient(ellipse at 78% 35%, #3c4a2b80, transparent 48%), radial-gradient(ellipse at 85% 65%, #79613d45, transparent 45%), #101310; }
 .hero-empty .round-arrow, .hero-empty .hero-art-bottom small { display: none; }
+/* While the first load runs, keep the placeholder captions out of layout so the featured cultivar's captions arrive without a shift. */
+body[aria-busy="true"] .hero-empty :is(.hero-art-top, .hero-art-bottom) { display: none; }
 .card-image .photo-image:has(img[src$="flower.svg"]) { display: grid; place-items: center; background: #20291c; }
 .card-image .photo-image img[src$="flower.svg"] { width: 56px; height: 56px; object-fit: contain; opacity: .45; }
 html[data-dark="true"] .garden-note { gap: 24px; padding: 32px; border: 0; border-top: 1px solid var(--ui-line); border-bottom: 1px solid var(--ui-line); border-radius: 0; background: transparent; }

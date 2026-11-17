@@ -30,7 +30,7 @@
   </defs></svg>
 
 
-  <div id="storeStatus" class="store-status" role="status" aria-live="polite"><span id="storeMessage">Opening the garden…</span><button id="reloadGallery" hidden>Reload the garden</button></div>
+  <div id="storeStatus" class="store-status" role="status" aria-live="polite" hidden><span id="storeMessage"></span><button id="reloadGallery" hidden>Reload the garden</button></div>
 
   <!-- OWNER_START -->
   <aside class="studio-bar"><span>OWNER STUDIO</span><a href="./" target="_blank" rel="noopener noreferrer">View public gallery ↗</a></aside>

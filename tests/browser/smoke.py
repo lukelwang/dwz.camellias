@@ -62,7 +62,16 @@ VIEWPORTS = {
     **{w: dict(viewport={'width': int(w), 'height': 900}) for w in ('581', '700', '768', '1024')},  # hero layout breakpoints between phone and desktop
 }
 INIT = """window.__csp = [];
-document.addEventListener('securitypolicyviolation', e => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));"""
+document.addEventListener('securitypolicyviolation', e => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
+// Cold-load record: header top on every animation frame and every #resultSummary text, each with the card count at that moment.
+window.__load = {tops: [], summary: []};
+(() => { const start = performance.now(), cards = () => document.querySelectorAll('#gallery .cultivar-card').length;
+  const tick = () => { const header = document.querySelector('.site-header'); if (header) __load.tops.push([Math.round(header.getBoundingClientRect().top * 100) / 100, cards()]);
+    if (performance.now() - start < 8000) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  const note = () => { const summary = document.querySelector('#resultSummary'); if (summary) __load.summary.push([summary.textContent, cards()]); };
+  document.addEventListener('DOMContentLoaded', () => { note(); const summary = document.querySelector('#resultSummary');
+    if (summary) new MutationObserver(note).observe(summary, {childList: true, characterData: true, subtree: true}); }); })();"""
 EXTRA_INIT = []  # seam for scratch negative tests; always empty in this file
 
 network = Counter()
@@ -157,7 +166,30 @@ def flow_load(context, vp):
     if any(album['photos'] for album in doc['albums']):
         page.wait_for_function("() => { const i = document.querySelector('.hero-art img'); return i && i.complete && i.naturalWidth > 0; }")
     no_overflow(page, f'{vp} page')
+    page.wait_for_timeout(300)  # a few more frames after the gallery settles
+    record = page.evaluate('() => window.__load')
+    tops = sorted({top for top, _ in record['tops']})
+    check(any(n == 0 for _, n in record['tops']) and any(n > 0 for _, n in record['tops']), f'header sampled before and after the cards appeared ({len(record["tops"])} frames)')
+    check(len(tops) == 1, f'header top stays constant during the cold load: {tops}')
+    check(any(text == 'Loading the garden…' and n == 0 for text, n in record['summary']), f'#resultSummary announced loading before the cards: {record["summary"][:4]}')
+    check(page.is_hidden('#storeStatus'), 'no status banner after a successful public load')
     finish(page, errors)
+
+def flow_load_failure(context, vp):
+    """The latest-commit lookup answers 500 (a stubbed GET; this page only): the status banner and "Reload the garden" appear."""
+    page = context.new_page(); page_errors = []
+    page.on('pageerror', lambda e: page_errors.append('pageerror: ' + str(e)[:200]))
+    page.route(REF_LOOKUP, lambda route, request: route.fulfill(status=500, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"message":"fixture failure"}'))
+    page.goto(BASE_URL, wait_until='domcontentloaded')
+    page.wait_for_selector('#reloadGallery', state='visible')
+    state = page.evaluate("""() => ({banner: !document.querySelector('#storeStatus').hidden && document.querySelector('#storeStatus').getClientRects().length > 0,
+        error: document.querySelector('#storeStatus').classList.contains('has-error'), message: document.querySelector('#storeMessage').textContent.trim().length > 0,
+        reload: document.querySelector('#reloadGallery').textContent.trim(), emptyReload: !document.querySelector('#emptyReload').hidden,
+        summary: document.querySelector('#resultSummary').textContent})""")
+    check(state == {'banner': True, 'error': True, 'message': True, 'reload': 'Reload the garden', 'emptyReload': True, 'summary': 'The garden could not be loaded.'},
+          f'a failed load shows the status banner with "Reload the garden": {state}')
+    check(not page.evaluate('() => window.__csp'), 'no CSP violations')
+    check(not page_errors, f'no page errors: {page_errors}')
 
 def flow_search(context, vp):
     page, doc, errors = open_page(context)
@@ -321,10 +353,12 @@ def flow_owner_gate(context, vp):
         adminVisible: [...document.querySelectorAll('[data-admin]')].filter(e => !e.hidden && e.getClientRects().length).length,
         cardAdmin: document.querySelectorAll('.card-admin').length, badgeHidden: document.querySelector('#adminBadge').hidden, settingsHidden: document.querySelector('#siteSettings').hidden})""")
     check(state == {'focusInLogin': True, 'tokenEmpty': True, 'adminVisible': 0, 'cardAdmin': 0, 'badgeHidden': True, 'settingsHidden': True}, f'unauthenticated owner page is gated: {state}')
+    check(page.evaluate("() => document.querySelector('#storeStatus')?.getAttribute('role') === 'status' && document.querySelector('#reloadGallery')?.textContent.trim() === 'Reload the garden'"),
+          'owner page keeps the status banner and "Reload the garden" markup')
     finish(page, errors)
 
 PLAN = [(vp, flow) for vp in ('390', '1440') for flow in (flow_load, flow_search, flow_filters, flow_album, flow_fullscreen)]
-PLAN += [('320', flow_overflow_320), ('390', flow_owner_gate)] + [(vp, flow_hero) for vp in ('320', '390', '581', '700', '768', '1024')]
+PLAN += [('390', flow_load_failure), ('1440', flow_load_failure), ('320', flow_overflow_320), ('390', flow_owner_gate)] + [(vp, flow_hero) for vp in ('320', '390', '581', '700', '768', '1024')]
 
 def main():
     print(redact(f'smoke: {BROWSER} {BASE_URL} api={"LIVE" if LIVE_API else "stubbed@" + FIXTURE_SHA[:7]} pinned-counts={"on" if PINNED else "off"}'))

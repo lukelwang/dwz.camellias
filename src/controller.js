@@ -203,7 +203,9 @@
     const generation = sessionGeneration;
     const root = focusRoot();
     const focus = rememberFocus(root);
-    loading = true; galleryLoadError = false; status('Loading the latest garden…'); renderGallery(); lockUI();
+    // The first public load is announced by #resultSummary; an in-flow banner here would push the page down and then collapse.
+    const reload = galleryLoaded || galleryLoadError || isManagerPage;
+    loading = true; galleryLoadError = false; if (reload) status('Loading the latest garden…'); renderGallery(); lockUI();
     try {
       const document = await store.loadPublic();
       if (generation !== sessionGeneration) return;
